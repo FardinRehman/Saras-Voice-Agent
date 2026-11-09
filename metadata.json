@@ -1,6 +1,6 @@
 {
-  "name": "XYZ Bank AI Voice Agent",
-  "description": "Enterprise hands-free AI voice banking customer support platform featuring Ananya, real-time voice activity detection, natural turn-taking, and banking workflows.",
+  "name": "Saras Dynamics AI Voice Agent",
+  "description": "Enterprise virtual company representative for Saras Dynamics (https://www.sarasdynamics.com/), powered by OpenAI Realtime speech-to-speech API, server VAD, dynamic RAG company knowledge ingestion, and customer enquiry lead capture.",
   "requestFramePermissions": ["microphone"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": ["MAJOR_CAPABILITY_OPENAI_REALTIME_API"]
 }

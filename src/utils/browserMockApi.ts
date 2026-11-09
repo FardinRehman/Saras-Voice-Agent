@@ -2,7 +2,7 @@ import { db } from '../server/db.ts';
 
 /**
  * Initializes client-side mock API interceptor for environments without a running Node.js backend
- * (such as GitHub Pages static hosting at https://fardinrehman.github.io/voice-agent-2.0/).
+ * (such as GitHub Pages static hosting).
  */
 export function initBrowserMockApi(): void {
   if (typeof window === 'undefined') return;
@@ -13,14 +13,11 @@ export function initBrowserMockApi(): void {
   window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
     const urlString = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
 
-    // Check if this is an API call
     if (urlString.startsWith('/api/') || urlString.includes('/api/')) {
-      // If we are on GitHub Pages or file protocol, handle directly client-side
       if (isGitHubPages || window.location.protocol === 'file:') {
         return handleMockApi(urlString, init);
       }
 
-      // If on localhost, try the real backend first; if it fails (e.g. server down or 404), fall back to client-side db
       try {
         const response = await originalFetch(input, init);
         if (response.status === 404) {
@@ -50,148 +47,144 @@ async function handleMockApi(urlString: string, init?: RequestInit): Promise<Res
     }
   }
 
-  // 1. GET /api/customers
-  if (pathname === '/api/customers' && method === 'GET') {
-    return jsonResponse(db.getCustomers());
+  // 1. GET /api/knowledge
+  if (pathname === '/api/knowledge' && method === 'GET') {
+    const category = url.searchParams.get('category') || undefined;
+    const search = url.searchParams.get('search') || undefined;
+    return jsonResponse(db.getKnowledgeChunks(category as any, search));
   }
 
-  // 2. GET /api/customers/:id
-  const customerMatch = pathname.match(/^\/api\/customers\/([^\/]+)$/);
-  if (customerMatch && method === 'GET') {
-    const customerId = customerMatch[1];
-    const customer = db.getCustomerById(customerId);
-    if (!customer) {
-      return jsonResponse({ error: 'Customer not found' }, 404);
-    }
-    const accounts = db.getAccountsByCustomer(customer.id);
-    const cards = db.getCardsByCustomer(customer.id);
-    const complaints = db.getComplaints(customer.id);
-    const transactions = db.getTransactions(customer.id, undefined, 20);
-    const serviceRequests = db.getServiceRequests(customer.id);
-    return jsonResponse({
-      customer,
-      accounts,
-      cards,
-      complaints,
-      transactions,
-      serviceRequests,
-    });
+  if (pathname === '/api/knowledge' && method === 'POST') {
+    const chunk = db.addKnowledgeChunk(body);
+    return jsonResponse(chunk, 201);
   }
 
-  // 3. POST /api/cards/:id/block
-  const blockMatch = pathname.match(/^\/api\/cards\/([^\/]+)\/block$/);
-  if (blockMatch && method === 'POST') {
-    const cardId = blockMatch[1];
-    const card = db.blockCard(cardId, body?.reason || 'Customer request via Portal');
-    return jsonResponse({ success: true, card });
+  const chunkDeleteMatch = pathname.match(/^\/api\/knowledge\/([^\/]+)$/);
+  if (chunkDeleteMatch && method === 'DELETE') {
+    const ok = db.deleteKnowledgeChunk(chunkDeleteMatch[1]);
+    return jsonResponse({ success: ok });
   }
 
-  // 4. POST /api/cards/:id/unblock
-  const unblockMatch = pathname.match(/^\/api\/cards\/([^\/]+)\/unblock$/);
-  if (unblockMatch && method === 'POST') {
-    const cardId = unblockMatch[1];
-    const card = db.unblockCard(cardId);
-    return jsonResponse({ success: true, card });
+  // 2. GET & POST /api/leads
+  if (pathname === '/api/leads' && method === 'GET') {
+    const status = url.searchParams.get('status') || undefined;
+    const search = url.searchParams.get('search') || undefined;
+    return jsonResponse(db.getLeads(status as any, search));
   }
 
-  // 5. GET /api/calls
+  if (pathname === '/api/leads' && method === 'POST') {
+    const lead = db.createLead(body);
+    return jsonResponse(lead, 201);
+  }
+
+  const leadPutMatch = pathname.match(/^\/api\/leads\/([^\/]+)$/);
+  if (leadPutMatch && method === 'PUT') {
+    const updated = db.updateLead(leadPutMatch[1], body);
+    return jsonResponse(updated || { error: 'Not found' }, updated ? 200 : 404);
+  }
+
+  // 3. GET & POST /api/website/pages
+  if (pathname === '/api/website/pages' && method === 'GET') {
+    return jsonResponse(db.getWebsitePages());
+  }
+
+  if (pathname === '/api/website/ingest' && method === 'POST') {
+    const page = db.ingestWebsitePage(body.url, body.title || body.url, body.content || 'Website section');
+    return jsonResponse({ success: true, page }, 201);
+  }
+
+  // 4. GET & POST /api/documents
+  if (pathname === '/api/documents' && method === 'GET') {
+    return jsonResponse(db.getDocuments());
+  }
+
+  if (pathname === '/api/documents/upload' && method === 'POST') {
+    const doc = db.ingestDocument(body.fileName, body.fileType || 'PDF', body.content);
+    return jsonResponse({ success: true, document: doc }, 201);
+  }
+
+  // 5. Calls
   if (pathname === '/api/calls' && method === 'GET') {
     return jsonResponse(db.getCallSessions());
   }
 
-  // 6. POST /api/calls/start
-  if (pathname === '/api/calls/start' && method === 'POST') {
-    const callerNumber = body?.callerNumber || '+91 98765 43210';
-    const mode = body?.mode || 'SIMULATION';
-    const customerId = body?.customerId;
-    const session = db.createCallSession(callerNumber, mode, customerId);
-    return jsonResponse(session);
+  const callMatch = pathname.match(/^\/api\/calls\/([^\/]+)$/);
+  if (callMatch && method === 'GET') {
+    const id = callMatch[1];
+    const session = db.getCallSession(id);
+    const transcripts = db.getTranscripts(id);
+    const toolExecutions = db.getToolExecutions(id);
+    return jsonResponse({ session, transcripts, toolExecutions });
   }
 
-  // 7. POST /api/calls/:id/end
+  if (pathname === '/api/calls/start' && method === 'POST') {
+    const session = db.createCallSession(body?.callerNumber || '+91 98765 43210', 'SIMULATION', body?.customerName);
+    return jsonResponse(session, 201);
+  }
+
   const endCallMatch = pathname.match(/^\/api\/calls\/([^\/]+)\/end$/);
   if (endCallMatch && method === 'POST') {
-    const callId = endCallMatch[1];
-    const session = db.endCallSession(callId, body?.durationSeconds || 15);
-    return jsonResponse(session || { success: true });
+    const session = db.getCallSession(endCallMatch[1]);
+    const duration = session ? Math.max(1, Math.round((Date.now() - new Date(session.startTime).getTime()) / 1000)) : 10;
+    const updated = db.updateCallSession(endCallMatch[1], {
+      status: 'COMPLETED',
+      endTime: new Date().toISOString(),
+      durationSeconds: duration,
+    });
+    return jsonResponse(updated || { success: true });
   }
 
-  // 8. GET /api/audit-logs
-  if (pathname === '/api/audit-logs' && method === 'GET') {
-    return jsonResponse(db.getAuditLogs());
-  }
-
-  // 9. GET /api/analytics
+  // 6. Analytics & Audit
   if (pathname === '/api/analytics' && method === 'GET') {
     return jsonResponse(db.getAnalytics());
   }
 
-  // 10. GET /api/otp/active/:customerId
-  const otpMatch = pathname.match(/^\/api\/otp\/active\/([^\/]+)$/);
-  if (otpMatch && method === 'GET') {
-    const customerId = otpMatch[1];
-    const otp = db.getActiveOtp(customerId);
-    return jsonResponse({ otp: otp || null });
+  if (pathname === '/api/audit-logs' && method === 'GET') {
+    return jsonResponse(db.getAuditLogs(100));
   }
 
-  // 11. POST /api/simulation/reset
-  if (pathname === '/api/simulation/reset' && method === 'POST') {
-    db.reset();
-    return jsonResponse({ success: true, message: 'Simulated banking data reset to default seed.' });
+  if (pathname === '/api/team' && method === 'GET') {
+    return jsonResponse(db.getUsers());
   }
 
-  // 12. GET /api/integrations
-  if (pathname === '/api/integrations' && method === 'GET') {
+  if (pathname === '/api/config/voice') {
     return jsonResponse({
-      telephony: {
-        provider: 'Twilio Voice (Simulated / Browser Mode)',
-        status: 'Connected',
-        configured: true,
-        phone: '+91 1800 123 4567',
-      },
-      crm: {
-        provider: 'Salesforce Core Banking CRM',
-        status: 'Synchronized',
-        configured: true,
-      },
-      coreBanking: {
-        provider: 'Finacle 11.x Core Banking Engine',
-        status: 'Healthy',
-        configured: true,
-      },
-      geminiLive: {
-        model: 'gemini-2.0-flash-exp (Multimodal Voice)',
-        status: 'Ready',
-        configured: true,
-      },
+      model: 'gpt-realtime',
+      voice: 'coral',
+      temperature: 0.7,
+      vadThreshold: 0.78,
+      language: 'Indian English',
     });
   }
 
-  // 13. POST /api/integrations/test
+  if (pathname === '/api/simulation/reset' && method === 'POST') {
+    db.seed();
+    return jsonResponse({ success: true, message: 'Reset to Saras Dynamics seed.' });
+  }
+
+  // 7. Integrations status
+  if (pathname === '/api/integrations') {
+    return jsonResponse({
+      openaiRealtime: { status: 'CONNECTED', model: 'gpt-realtime', voice: 'coral', configured: true },
+      knowledgeBase: { status: 'ACTIVE', totalChunks: db.getKnowledgeChunks().length, vectorEngine: 'IN_MEMORY_COSINE' },
+      telephony: { status: 'SIMULATED', supportNumber: '+91 80 4000 8888', liveModeEnabled: false },
+      sarasDynamicsCrm: { status: 'ACTIVE', totalLeads: db.getLeads().length },
+    });
+  }
+
   if (pathname === '/api/integrations/test' && method === 'POST') {
-    return jsonResponse({ success: true, message: `Connected to ${body?.type || 'Banking Core'} successfully.` });
+    return jsonResponse({ success: true, message: `${body?.target || 'Integration'} test simulated successfully.` });
   }
 
-  // 14. POST /api/voice/synthesize
-  if (pathname === '/api/voice/synthesize' && method === 'POST') {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(body?.text || 'Namaste! I am Ananya from XYZ Bank.');
-      utterance.rate = 1.0;
-      utterance.pitch = 1.05;
-      window.speechSynthesis.speak(utterance);
-    }
-    return jsonResponse({ success: true, synthesized: true });
-  }
-
-  return jsonResponse({ error: `Not found: ${method} ${pathname}` }, 404);
+  return jsonResponse({ error: 'Endpoint not found in mock router' }, 404);
 }
 
-function jsonResponse(data: any, status = 200): Response {
+function jsonResponse(data: any, status: number = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       'Content-Type': 'application/json',
+      'X-Mock-API': 'true',
     },
   });
 }

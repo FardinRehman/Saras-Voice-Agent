@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Customer } from './types/banking.ts';
+import React, { useState } from 'react';
+import { CustomerEnquiry } from './types/saras.ts';
 import { Header } from './components/Header.tsx';
 import { Sidebar, ActiveTab } from './components/Sidebar.tsx';
 import { VoiceSimulator } from './components/VoiceSimulator.tsx';
@@ -8,52 +8,40 @@ import { AdminDashboard } from './components/AdminDashboard.tsx';
 import { IntegrationsPage } from './components/IntegrationsPage.tsx';
 import { AuditLogsPage } from './components/AuditLogsPage.tsx';
 import { HomeOverview } from './components/HomeOverview.tsx';
-import { CustomerPickerModal } from './components/CustomerPickerModal.tsx';
+import { Sparkles, CheckCircle2, Globe, ExternalLink } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('simulator');
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [currentCustomer, setCurrentCustomer] = useState<Customer | null>(null);
-  const [isPickerOpen, setIsPickerOpen] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [speakerVolume, setSpeakerVolume] = useState<number>(0.9);
   const [isTestingVoice, setIsTestingVoice] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // Fetch initial synthetic customer list
-  const loadCustomers = async () => {
-    try {
-      const res = await fetch('/api/customers');
-      const data = await res.json();
-      setCustomers(data || []);
-      if (data && data.length > 0 && !currentCustomer) {
-        // Default to Rajesh Sharma (CUST-1001) who has multiple accounts
-        setCurrentCustomer(data[0]);
-      }
-    } catch (e) {
-      console.error('Failed to load customers:', e);
-    }
-  };
-
-  useEffect(() => {
-    loadCustomers();
-  }, []);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
   // Voice Preview Test using server-side TTS
   const handleTestVoice = async () => {
     setIsTestingVoice(true);
     try {
+      // Fetch currently configured voice from server
+      let currentVoice = 'coral';
+      try {
+        const cfgRes = await fetch('/api/config/voice');
+        if (cfgRes.ok) {
+          const cfg = await cfgRes.json();
+          if (cfg?.voice) currentVoice = cfg.voice;
+        }
+      } catch {}
+
       const res = await fetch('/api/voice/synthesize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: 'Namaste! I am Ananya, your virtual voice banking assistant at XYZ Bank. How can I assist you with your accounts or cards today?',
-          voiceName: 'Kore',
+          text: "Hey! Welcome to Saras Dynamics. I'm Saras, your AI assistant. It's great to have you here! I can help you explore our AI solutions, software development services, or even discuss an idea you're planning to build. So, what brings you here today?",
+          voice: currentVoice,
         }),
       });
       const data = await res.json();
       if (data.audio) {
-        // Play sample audio
-        const audio = new Audio(`data:audio/wav;base64,${data.audio}`);
+        const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
         audio.volume = speakerVolume;
         await audio.play();
       } else {
@@ -66,95 +54,104 @@ export default function App() {
     }
   };
 
-  // Reset database to initial synthetic seed
-  const handleResetData = async () => {
-    if (!confirm('Reset simulated database to default seed records? All changes will revert to defaults.')) return;
-    try {
-      const res = await fetch('/api/simulation/reset', { method: 'POST' });
-      const data = await res.json();
-      setToastMessage(data.message || 'Database reset successfully');
-      setTimeout(() => setToastMessage(null), 3000);
-      loadCustomers();
-    } catch (e: any) {
-      alert(e.message);
-    }
-  };
-
-  const handleSelectCustomer = (customerId: string) => {
-    const found = customers.find((c) => c.id === customerId);
-    if (found) {
-      setCurrentCustomer(found);
-      setToastMessage(`Switched simulated customer to ${found.name}`);
-      setTimeout(() => setToastMessage(null), 3000);
-    }
+  const handleLeadCaptured = (lead: CustomerEnquiry) => {
+    setToastMessage(`Project enquiry registered for ${lead.customerName} (${lead.requiredService})`);
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-teal-500 selection:text-slate-950">
+    <div className="min-h-screen bg-[#F5F5F7] dark:bg-[#111111] text-[#171717] dark:text-[#F5F5F7] flex flex-col font-sans selection:bg-[#E50918] selection:text-white">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl border border-slate-700 animate-in slide-in-from-bottom-2 flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-teal-400" />
+        <div className="fixed bottom-5 right-5 z-50 bg-[#171717] text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-red-500/40 animate-in slide-in-from-bottom-2 flex items-center gap-2.5">
+          <span className="w-2 h-2 rounded-full bg-[#E50918] animate-ping" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Main App Header */}
+      {/* Global Enterprise Header */}
       <Header
-        currentCustomer={currentCustomer}
-        onOpenCustomerPicker={() => setIsPickerOpen(true)}
-        onResetData={handleResetData}
         volume={speakerVolume}
         onChangeVolume={setSpeakerVolume}
         onTestVoice={handleTestVoice}
         isTestingVoice={isTestingVoice}
         onNavigateToSimulator={() => setActiveTab('simulator')}
+        onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+        isMobileSidebarOpen={isMobileSidebarOpen}
       />
 
-      {/* Navigation Tabs */}
-      <Sidebar activeTab={activeTab} onSelectTab={setActiveTab} />
+      {/* App Body Layout: Sidebar + Main Content Area */}
+      <div className="flex-1 flex w-full">
+        {/* Navigation Sidebar (Desktop persistent + Mobile drawer) */}
+        <Sidebar
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          isMobileOpen={isMobileSidebarOpen}
+          onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        />
 
-      {/* Main Page View */}
-      <main className="flex-1 pb-16">
-        {activeTab === 'simulator' && (
-          <VoiceSimulator
-            currentCustomer={currentCustomer}
-            onOpenCustomerPicker={() => setIsPickerOpen(true)}
-            speakerVolume={speakerVolume}
-            onCallEnded={loadCustomers}
-          />
-        )}
+        {/* Main Workspace Area */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
+          <main className="flex-1 pb-16">
+            {activeTab === 'overview' && (
+              <HomeOverview
+                onNavigateToSimulator={() => setActiveTab('simulator')}
+                onNavigateToServices={() => setActiveTab('services')}
+              />
+            )}
 
-        {activeTab === 'customer' && (
-          <CustomerDashboard
-            currentCustomer={currentCustomer}
-            onOpenCustomerPicker={() => setIsPickerOpen(true)}
-          />
-        )}
+            {activeTab === 'simulator' && (
+              <VoiceSimulator
+                speakerVolume={speakerVolume}
+                onLeadCaptured={handleLeadCaptured}
+              />
+            )}
 
-        {activeTab === 'admin' && <AdminDashboard />}
+            {activeTab === 'services' && <CustomerDashboard />}
 
-        {activeTab === 'audit' && <AuditLogsPage />}
+            {activeTab === 'admin' && <AdminDashboard />}
 
-        {activeTab === 'integrations' && <IntegrationsPage />}
+            {activeTab === 'audit' && <AuditLogsPage />}
 
-        {activeTab === 'overview' && (
-          <HomeOverview
-            onNavigateToSimulator={() => setActiveTab('simulator')}
-            onOpenCustomerPicker={() => setIsPickerOpen(true)}
-            currentCustomer={currentCustomer}
-          />
-        )}
-      </main>
+            {activeTab === 'integrations' && <IntegrationsPage />}
+          </main>
 
-      {/* Customer Picker Modal */}
-      <CustomerPickerModal
-        isOpen={isPickerOpen}
-        onClose={() => setIsPickerOpen(false)}
-        customers={customers}
-        selectedCustomerId={currentCustomer?.id || ''}
-        onSelectCustomer={handleSelectCustomer}
-      />
+          {/* Corporate Footer */}
+          <footer className="border-t border-[#E5E5E7] dark:border-[#262626] bg-white dark:bg-[#141414] py-6 text-center text-xs text-slate-500 dark:text-slate-400 mt-auto">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <img src="/assets/saras-logo.png" alt="Saras Dynamics" className="h-6 w-auto" />
+                <span className="text-slate-300 dark:text-slate-700">|</span>
+                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                  AI Voice Agent v2.1
+                </span>
+                <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">•</span>
+                <span className="hidden sm:inline text-slate-400">Enterprise AI Voice Architecture</span>
+              </div>
+
+              <div className="flex items-center gap-4 text-[11px]">
+                <a
+                  href="https://sarasdynamics.com/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-[#E50918] transition-colors"
+                >
+                  Official Website
+                </a>
+                <a
+                  href="https://sarasdynamics.com/contact"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-[#E50918] transition-colors"
+                >
+                  Start a Project
+                </a>
+                <span className="text-slate-400">Coimbatore, Tamil Nadu, India</span>
+              </div>
+            </div>
+          </footer>
+        </div>
+      </div>
     </div>
   );
 }

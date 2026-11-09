@@ -5,11 +5,11 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(({ mode }) => {
   return {
-    base: process.env.VITE_BASE_PATH || (mode === 'production' ? '/voice-agent-2.0/' : '/'),
+    base: process.env.VITE_BASE_PATH || '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname || '.', '.'),
       },
     },
     server: {

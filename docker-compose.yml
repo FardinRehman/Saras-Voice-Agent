@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  saras-voice-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: saras-dynamics-voice-agent
+    restart: unless-stopped
+    ports:
+      - "${PORT:-5000}:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - APP_URL=${APP_URL:-http://localhost:5000}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_REALTIME_MODEL=${OPENAI_REALTIME_MODEL:-gpt-realtime}
+      - OPENAI_REALTIME_VOICE=${OPENAI_REALTIME_VOICE:-coral}
+      - OPENAI_VAD_THRESHOLD=${OPENAI_VAD_THRESHOLD:-0.78}
+      - DATABASE_URL=postgresql://saras_user:saras_secure_pass_2026@saras-postgres:5432/saras_dynamics_voice
+    depends_on:
+      saras-postgres:
+        condition: service_healthy
+
+  saras-postgres:
+    image: pgvector/pgvector:pg16
+    container_name: saras-dynamics-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: saras_dynamics_voice
+      POSTGRES_USER: saras_user
+      POSTGRES_PASSWORD: saras_secure_pass_2026
+    ports:
+      - "5432:5432"
+    volumes:
+      - saras_pgdata:/var/lib/postgresql/data
+      - ./src/server/db/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U saras_user -d saras_dynamics_voice"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  saras_pgdata:
+

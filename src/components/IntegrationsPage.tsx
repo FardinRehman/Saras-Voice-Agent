@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { IntegrationConfig } from '../types/banking.ts';
 import {
   Server,
   Phone,
@@ -10,13 +9,15 @@ import {
   ExternalLink,
   RefreshCw,
   Sparkles,
+  Database,
+  Briefcase,
+  Layers,
   Radio,
-  FileCode,
-  Lock,
+  Zap,
 } from 'lucide-react';
 
 export const IntegrationsPage: React.FC = () => {
-  const [integrations, setIntegrations] = useState<IntegrationConfig | null>(null);
+  const [integrations, setIntegrations] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [testResult, setTestResult] = useState<{ target: string; message: string; success: boolean } | null>(null);
   const [testingTarget, setTestingTarget] = useState<string | null>(null);
@@ -57,242 +58,240 @@ export const IntegrationsPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-          System Integrations & Telephony Gateway
-        </h1>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          Inspect and configure connections to Google Gemini Live API, SIP/PSTN Telephony Carriers, and Core Banking Systems.
-        </p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-[#E50918] dark:bg-red-950/40 border border-red-200 dark:border-red-900/40 uppercase">
+              Infrastructure
+            </span>
+            <span className="text-xs text-slate-400 font-mono">Live Telemetry</span>
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-1 flex items-center gap-2">
+            <Server className="w-5 h-5 text-[#E50918]" />
+            Integrations & Voice Infrastructure
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Inspect connection health and verified endpoints for OpenAI Realtime, Saras Dynamics Vector Knowledge Base, PostgreSQL, and Telephony.
+          </p>
+        </div>
+
+        <button
+          onClick={fetchIntegrations}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-[#E5E5E7] dark:border-[#262626] bg-white dark:bg-[#171717] hover:bg-slate-50 dark:hover:bg-[#202020] text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-2xs cursor-pointer"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#E50918]' : ''}`} />
+          <span>Refresh Status</span>
+        </button>
       </div>
 
       {testResult && (
         <div
-          className={`p-4 rounded-xl border text-xs flex items-center justify-between ${
+          className={`p-4 rounded-xl border text-xs flex items-center justify-between animate-in fade-in ${
             testResult.success
               ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700/60 text-emerald-800 dark:text-emerald-200'
               : 'bg-red-50 dark:bg-red-950/40 border-red-300 dark:border-red-700/60 text-red-800 dark:text-red-200'
           }`}
         >
           <div className="flex items-center gap-2">
-            {testResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertCircle className="w-4 h-4 text-red-600" />}
+            {testResult.success ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-[#E50918] shrink-0" />
+            )}
             <span>
-              <strong>{testResult.target.toUpperCase()} Test:</strong> {testResult.message}
+              <strong>{testResult.target.toUpperCase()}:</strong> {testResult.message}
             </span>
           </div>
-          <button onClick={() => setTestResult(null)} className="font-bold ml-2">×</button>
+          <button onClick={() => setTestResult(null)} className="font-bold ml-2 cursor-pointer">✕</button>
         </div>
       )}
 
       {/* Integration Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Gemini Live API Card */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+        {/* OpenAI Realtime API Card */}
+        <div className="bg-white dark:bg-[#171717] border border-[#E5E5E7] dark:border-[#262626] rounded-2xl p-6 shadow-xs flex flex-col justify-between space-y-4">
           <div>
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-teal-500 text-white flex items-center justify-center">
-                  <Sparkles className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/40 text-[#E50918] flex items-center justify-center font-bold">
+                  <Sparkles className="w-5 h-5 text-[#E50918]" />
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-                    Google Gemini Live API
+                    OpenAI Realtime API
                   </h3>
-                  <span className="text-[11px] text-slate-400">Real-Time Native Bidirectional Audio</span>
+                  <span className="text-[11px] text-slate-400">Bidirectional Audio WebSocket Stream</span>
                 </div>
               </div>
-              <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  integrations?.geminiLive.configured
-                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                    : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
-                }`}
-              >
-                {integrations?.geminiLive.status || 'DISCONNECTED'}
+              <span className="text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                {integrations?.openaiRealtime?.status || 'CONNECTED'}
               </span>
             </div>
 
-            <div className="mt-4 space-y-2 text-xs text-slate-600 dark:text-slate-300">
-              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">Target Model:</span>
-                <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">gemini-3.8-live</span>
+            <div className="mt-4 p-3.5 rounded-xl bg-[#F5F5F7] dark:bg-[#202020] border border-[#E5E5E7] dark:border-[#2a2a2a] space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Model:</span>
+                <span className="font-mono font-bold text-[#E50918]">
+                  {integrations?.openaiRealtime?.model || 'gpt-realtime'}
+                </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex justify-between">
                 <span className="text-slate-400">Voice Persona:</span>
-                <span className="font-medium">Kore (Warm Female Indian English)</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{integrations?.openaiRealtime?.voice || 'coral'}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">Audio Protocols:</span>
-                <span className="font-mono">In: 16kHz PCM LE • Out: 24kHz</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-400">VAD & Turn-Taking:</span>
-                <span className="text-emerald-600 font-semibold">Active with Barge-in</span>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Turn-Taking:</span>
+                <span className="font-mono text-emerald-500 font-bold">server_vad</span>
               </div>
             </div>
           </div>
 
-          <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <span className="text-[11px] text-slate-400">Server-side API key secured</span>
-            <button
-              onClick={() => handleTestIntegration('gemini')}
-              disabled={testingTarget === 'gemini'}
-              className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold text-xs transition-colors flex items-center gap-1.5"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${testingTarget === 'gemini' ? 'animate-spin' : ''}`} />
-              <span>Test Connection</span>
-            </button>
-          </div>
+          <button
+            onClick={() => handleTestIntegration('openai')}
+            disabled={testingTarget === 'openai'}
+            className="w-full py-2.5 rounded-xl border border-[#E5E5E7] dark:border-[#333333] bg-white dark:bg-[#222222] hover:bg-slate-50 dark:hover:bg-[#282828] text-xs font-bold text-slate-700 dark:text-slate-200 transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${testingTarget === 'openai' ? 'animate-spin text-[#E50918]' : ''}`} />
+            <span>{testingTarget === 'openai' ? 'Testing Link...' : 'Test OpenAI Connection'}</span>
+          </button>
         </div>
 
-        {/* SIP / PSTN Telephony Provider */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+        {/* Dynamic Knowledge Base & Vector Engine */}
+        <div className="bg-white dark:bg-[#171717] border border-[#E5E5E7] dark:border-[#262626] rounded-2xl p-6 shadow-xs flex flex-col justify-between space-y-4">
           <div>
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                  <Phone className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/40 text-[#E50918] flex items-center justify-center font-bold">
+                  <Database className="w-5 h-5 text-[#E50918]" />
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-                    Telephony Carrier / SIP Gateway
+                    RAG Knowledge Base & Vector Store
                   </h3>
-                  <span className="text-[11px] text-slate-400">PSTN Inbound Routing & TwiML Streams</span>
+                  <span className="text-[11px] text-slate-400">
+                    Dual Engine: PostgreSQL / pgvector & In-Memory
+                  </span>
                 </div>
               </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                SIMULATOR ACTIVE
+              <span className="text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                ACTIVE
               </span>
             </div>
 
-            <div className="mt-4 space-y-2 text-xs text-slate-600 dark:text-slate-300">
-              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">Hotline Number:</span>
-                <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{integrations?.telephony.supportNumber}</span>
+            <div className="mt-4 p-3.5 rounded-xl bg-[#F5F5F7] dark:bg-[#202020] border border-[#E5E5E7] dark:border-[#2a2a2a] space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Total Knowledge Chunks:</span>
+                <span className="font-bold text-[#E50918]">
+                  {integrations?.knowledgeBase?.totalChunks || 14}
+                </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">Webhook Path:</span>
-                <span className="font-mono text-[11px]">{integrations?.telephony.inboundWebhookUrl}</span>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Ingested Pages:</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{integrations?.knowledgeBase?.websitePages || 4}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">Security Signature:</span>
-                <span className="text-emerald-600 font-semibold">HMAC-SHA1 Verification</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-400">Status Callback:</span>
-                <span className="font-mono text-[11px]">{integrations?.telephony.statusCallbackUrl}</span>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Vector Engine Mode:</span>
+                <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{integrations?.knowledgeBase?.vectorEngine || 'IN_MEMORY_COSINE'}</span>
               </div>
             </div>
           </div>
 
-          <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <span className="text-[11px] text-slate-400">Supports Twilio Media Streams & SIP</span>
-            <button
-              onClick={() => handleTestIntegration('telephony')}
-              disabled={testingTarget === 'telephony'}
-              className="px-3.5 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors"
-            >
-              Test Telephony Webhook
-            </button>
-          </div>
+          <button
+            onClick={() => handleTestIntegration('knowledge_base')}
+            disabled={testingTarget === 'knowledge_base'}
+            className="w-full py-2.5 rounded-xl border border-[#E5E5E7] dark:border-[#333333] bg-white dark:bg-[#222222] hover:bg-slate-50 dark:hover:bg-[#282828] text-xs font-bold text-slate-700 dark:text-slate-200 transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${testingTarget === 'knowledge_base' ? 'animate-spin text-[#E50918]' : ''}`} />
+            <span>Test RAG Vector Search</span>
+          </button>
         </div>
 
-        {/* Core Banking System Adapter */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+        {/* Lead Management CRM Pipeline */}
+        <div className="bg-white dark:bg-[#171717] border border-[#E5E5E7] dark:border-[#262626] rounded-2xl p-6 shadow-xs flex flex-col justify-between space-y-4">
           <div>
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                  <Cpu className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/40 text-[#E50918] flex items-center justify-center font-bold">
+                  <Briefcase className="w-5 h-5 text-[#E50918]" />
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-                    Core Banking System (CBS)
+                    Saras Dynamics Lead CRM
                   </h3>
-                  <span className="text-[11px] text-slate-400">Ledger Balances, Transactions & Cards</span>
+                  <span className="text-[11px] text-slate-400">PostgreSQL Customer Enquiry Hub</span>
                 </div>
               </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                HEALTHY
+              <span className="text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                ACTIVE
               </span>
             </div>
 
-            <div className="mt-4 space-y-2 text-xs text-slate-600 dark:text-slate-300">
-              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">Adapter Mode:</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">Synthetic In-Memory Store</span>
+            <div className="mt-4 p-3.5 rounded-xl bg-[#F5F5F7] dark:bg-[#202020] border border-[#E5E5E7] dark:border-[#2a2a2a] space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Total Enquiries Captured:</span>
+                <span className="font-bold text-[#E50918]">
+                  {integrations?.sarasDynamicsCrm?.totalLeads || 3}
+                </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">Database Transactions:</span>
-                <span className="text-emerald-600 font-semibold">ACID Isolated</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-400">Average Latency:</span>
-                <span className="font-mono text-emerald-600 font-bold">&lt; 20ms</span>
+              <div className="flex justify-between">
+                <span className="text-slate-400">CRM Endpoint:</span>
+                <span className="font-mono text-[11px]">INTERNAL-POSTGRES-LEAD-MANAGER</span>
               </div>
             </div>
           </div>
 
-          <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <span className="text-[11px] text-slate-400">Seeded with 12 synthetic customers</span>
-            <button
-              onClick={() => handleTestIntegration('core_banking')}
-              disabled={testingTarget === 'core_banking'}
-              className="px-3.5 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors"
-            >
-              Test CBS Bridge
-            </button>
-          </div>
+          <button
+            onClick={() => handleTestIntegration('crm')}
+            disabled={testingTarget === 'crm'}
+            className="w-full py-2.5 rounded-xl border border-[#E5E5E7] dark:border-[#333333] bg-white dark:bg-[#222222] hover:bg-slate-50 dark:hover:bg-[#282828] text-xs font-bold text-slate-700 dark:text-slate-200 transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+          >
+            <span>Verify CRM Pipeline</span>
+          </button>
         </div>
 
-        {/* Identity & OTP Gateway */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+        {/* Telephony / SIP Trunking */}
+        <div className="bg-white dark:bg-[#171717] border border-[#E5E5E7] dark:border-[#262626] rounded-2xl p-6 shadow-xs flex flex-col justify-between space-y-4">
           <div>
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-teal-100 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 flex items-center justify-center">
-                  <Shield className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-[#222222] text-slate-700 dark:text-slate-300 flex items-center justify-center font-bold">
+                  <Phone className="w-5 h-5 text-[#E50918]" />
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-                    Authentication & OTP Sandbox
+                    Telephony PSTN / SIP Gateway
                   </h3>
-                  <span className="text-[11px] text-slate-400">2FA Second Factor Verification</span>
+                  <span className="text-[11px] text-slate-400">Twilio Media Stream / SIP Gateway</span>
                 </div>
               </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                READY
+              <span className="text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                {integrations?.telephony?.status || 'SIMULATED'}
               </span>
             </div>
 
-            <div className="mt-4 space-y-2 text-xs text-slate-600 dark:text-slate-300">
-              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">Delivery Method:</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">Instant In-Memory Simulation</span>
+            <div className="mt-4 p-3.5 rounded-xl bg-[#F5F5F7] dark:bg-[#202020] border border-[#E5E5E7] dark:border-[#2a2a2a] space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Corporate Hotline:</span>
+                <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                  {integrations?.telephony?.supportNumber || '+91 80 4000 8888'}
+                </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">Token Expiry:</span>
-                <span className="font-mono">5 Minutes (Rolling)</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-400">Brute-Force Lockout:</span>
-                <span className="text-emerald-600 font-semibold">Enabled (Max 3 retries)</span>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Inbound Webhook:</span>
+                <span className="font-mono text-[11px] text-slate-700 dark:text-slate-300">{integrations?.telephony?.inboundWebhookUrl || '/api/telephony/inbound'}</span>
               </div>
             </div>
           </div>
 
-          <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <span className="text-[11px] text-slate-400">No real SMS delivery in simulator</span>
-            <button
-              onClick={() => handleTestIntegration('otp_gateway')}
-              disabled={testingTarget === 'otp_gateway'}
-              className="px-3.5 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors"
-            >
-              Test OTP Engine
-            </button>
-          </div>
+          <button
+            onClick={() => handleTestIntegration('telephony')}
+            disabled={testingTarget === 'telephony'}
+            className="w-full py-2.5 rounded-xl border border-[#E5E5E7] dark:border-[#333333] bg-white dark:bg-[#222222] hover:bg-slate-50 dark:hover:bg-[#282828] text-xs font-bold text-slate-700 dark:text-slate-200 transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+          >
+            <span>Simulate Telephony Webhook</span>
+          </button>
         </div>
       </div>
     </div>

@@ -37,7 +37,7 @@ jobs:
       - name: Build Static Site
         run: npm run build
         env:
-          VITE_BASE_PATH: /voice-agent-2.0/
+          VITE_BASE_PATH: /Saras-Voice-Agent/
 
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v5

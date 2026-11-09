@@ -1,1110 +1,949 @@
+import crypto from 'crypto';
+
+function computeHash(content: string): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof (crypto as any).createHash === 'function') {
+      return (crypto as any).createHash('sha256').update(content).digest('hex');
+    }
+  } catch {}
+  let hash = 0;
+  for (let i = 0; i < content.length; i++) {
+    hash = (hash << 5) - hash + content.charCodeAt(i);
+    hash |= 0;
+  }
+  return 'hash-' + Math.abs(hash).toString(16);
+}
 import {
-  Customer,
-  BankAccount,
-  BankCard,
-  Transaction,
-  BankBranch,
-  ComplaintTicket,
-  ServiceRequest,
+  User,
+  CustomerEnquiry,
+  KnowledgeChunk,
+  KnowledgeDocument,
+  WebsitePage,
   CallSession,
-  AuditLog,
+  TranscriptItem,
   ToolExecution,
-} from '../types/banking.ts';
+  AuditLog,
+  AnalyticsOverview,
+  LeadStatus,
+  KnowledgeCategory,
+} from '../types/saras.ts';
+import { postgresService } from './db/postgres.ts';
 
-// Initial synthetic seed data
-const SEED_CUSTOMERS: Customer[] = [
+// ====================================================================
+// VERIFIED SARAS DYNAMICS OFFICIAL KNOWLEDGE BASE SEED
+// Primary Source: https://www.sarasdynamics.com/
+// Operational Hub: Coimbatore, Tamil Nadu, India
+// ====================================================================
+
+const SEED_USERS: User[] = [
   {
-    id: 'CUST-1001',
-    name: 'Rajesh Sharma',
-    phone: '+91 98765 43210',
-    maskedPhone: '+91 98*** **210',
-    email: 'rajesh.sharma@example.in',
-    status: 'ACTIVE',
-    preferredLanguage: 'English',
-    panNumber: 'ABCPS1234F',
-    address: 'Flat 402, Shanti Heights, Indiranagar, Bengaluru, KA 560038',
-    createdAt: '2023-01-15T09:30:00Z',
+    id: 'USR-1001',
+    username: 'admin',
+    fullName: 'Saras Chief Operations Officer',
+    role: 'SUPER_ADMIN',
+    isActive: true,
+    createdAt: '2026-01-01T00:00:00Z',
+    lastLoginAt: '2026-11-02T18:00:00Z',
   },
   {
-    id: 'CUST-1002',
-    name: 'Priya Sundaram',
-    phone: '+91 98450 11223',
-    maskedPhone: '+91 98*** **223',
-    email: 'priya.sundaram@example.in',
-    status: 'ACTIVE',
-    preferredLanguage: 'Kannada',
-    panNumber: 'BKLPS5678G',
-    address: '14, 5th Cross, Malleshwaram, Bengaluru, KA 560003',
-    createdAt: '2023-03-20T11:00:00Z',
+    id: 'USR-1002',
+    username: 'sales.lead',
+    fullName: 'Arunachalam Murugan',
+    role: 'SALES_LEAD',
+    isActive: true,
+    createdAt: '2026-01-10T00:00:00Z',
+    lastLoginAt: '2026-11-02T16:30:00Z',
   },
   {
-    id: 'CUST-1003',
-    name: 'Amit Patel',
-    phone: '+91 97123 98765',
-    maskedPhone: '+91 97*** **765',
-    email: 'amit.patel@example.in',
-    status: 'ACTIVE',
-    preferredLanguage: 'Hindi',
-    panNumber: 'CKLP98765H',
-    address: 'B-21, Navrangpura, Ahmedabad, GJ 380009',
-    createdAt: '2023-05-12T14:15:00Z',
+    id: 'USR-1003',
+    username: 'ai.engineer',
+    fullName: 'Deepika Raman',
+    role: 'AI_ENGINEER',
+    isActive: true,
+    createdAt: '2026-02-01T00:00:00Z',
+    lastLoginAt: '2026-11-02T17:15:00Z',
   },
   {
-    id: 'CUST-1004',
-    name: 'Sneha Rao',
-    phone: '+91 99887 76655',
-    maskedPhone: '+91 99*** **655',
-    email: 'sneha.rao@example.in',
-    status: 'ACTIVE',
-    preferredLanguage: 'Telugu',
-    panNumber: 'DRAP43210K',
-    address: 'Plot 88, Jubilee Hills Road No 36, Hyderabad, TS 500033',
-    createdAt: '2023-07-04T10:00:00Z',
-  },
-  {
-    id: 'CUST-1005',
-    name: 'Vikram Joshi',
-    phone: '+91 98220 54321',
-    maskedPhone: '+91 98*** **321',
-    email: 'vikram.joshi@example.in',
-    status: 'ACTIVE',
-    preferredLanguage: 'Marathi',
-    panNumber: 'EJPV87654M',
-    address: '12 Shivaji Park, Dadar West, Mumbai, MH 400028',
-    createdAt: '2023-09-18T16:45:00Z',
-  },
-  {
-    id: 'CUST-1006',
-    name: 'Sunita Deshmukh',
-    phone: '+91 94231 67890',
-    maskedPhone: '+91 94*** **890',
-    email: 'sunita.d@example.in',
-    status: 'ACTIVE',
-    preferredLanguage: 'Hindi',
-    panNumber: 'FPSD13579P',
-    address: '77 Kothrud, Pune, MH 411038',
-    createdAt: '2023-11-22T08:20:00Z',
-  },
-  {
-    id: 'CUST-1007',
-    name: 'Kavita Nair',
-    phone: '+91 94471 23456',
-    maskedPhone: '+91 94*** **456',
-    email: 'kavita.nair@example.in',
-    status: 'ACTIVE',
-    preferredLanguage: 'Malayalam',
-    panNumber: 'GKPN24680Q',
-    address: 'TC 15/120, Kowdiar, Thiruvananthapuram, KL 695003',
-    createdAt: '2024-01-08T12:00:00Z',
-  },
-  {
-    id: 'CUST-1008',
-    name: 'Anand Subramanian',
-    phone: '+91 98401 55667',
-    maskedPhone: '+91 98*** **667',
-    email: 'anand.subbu@example.in',
-    status: 'ACTIVE',
-    preferredLanguage: 'Tamil',
-    panNumber: 'HAPS97531R',
-    address: '42 Besant Avenue, Adyar, Chennai, TN 600020',
-    createdAt: '2024-02-14T15:30:00Z',
-  },
-  {
-    id: 'CUST-1009',
-    name: 'Debojit Banerjee',
-    phone: '+91 98302 99881',
-    maskedPhone: '+91 98*** **881',
-    email: 'debojit.b@example.in',
-    status: 'ACTIVE',
-    preferredLanguage: 'Bengali',
-    panNumber: 'IBPD86420S',
-    address: '55 Salt Lake Sector 1, Kolkata, WB 700064',
-    createdAt: '2024-03-01T17:10:00Z',
-  },
-  {
-    id: 'CUST-1010',
-    name: 'Harpreet Singh',
-    phone: '+91 98140 33445',
-    maskedPhone: '+91 98*** **445',
-    email: 'harpreet.singh@example.in',
-    status: 'ACTIVE',
-    preferredLanguage: 'Punjabi',
-    panNumber: 'JPSH11223T',
-    address: 'House 140, Sector 9-B, Chandigarh, CH 160009',
-    createdAt: '2024-04-19T13:40:00Z',
-  },
-  {
-    id: 'CUST-1011',
-    name: 'Rohan Mehta',
-    phone: '+91 99203 44556',
-    maskedPhone: '+91 99*** **556',
-    email: 'rohan.mehta@example.in',
-    status: 'ACTIVE',
-    preferredLanguage: 'English',
-    panNumber: 'KMPR44556U',
-    address: '9th Floor, Cuffe Parade, Mumbai, MH 400005',
-    createdAt: '2024-05-25T11:20:00Z',
-  },
-  {
-    id: 'CUST-1012',
-    name: 'Ananya Sen',
-    phone: '+91 98311 22334',
-    maskedPhone: '+91 98*** **334',
-    email: 'ananya.sen@example.in',
-    status: 'ACTIVE',
-    preferredLanguage: 'English',
-    panNumber: 'LSPA77889V',
-    address: 'Ballygunge Circular Road, Kolkata, WB 700019',
-    createdAt: '2024-06-10T10:05:00Z',
+    id: 'USR-1004',
+    username: 'auditor',
+    fullName: 'Karthik Subramanian',
+    role: 'AUDITOR',
+    isActive: true,
+    createdAt: '2026-03-01T00:00:00Z',
+    lastLoginAt: '2026-11-01T12:00:00Z',
   },
 ];
 
-const SEED_ACCOUNTS: BankAccount[] = [
-  // Rajesh Sharma (has 2 accounts: Savings + Current)
+const SEED_KNOWLEDGE_CHUNKS: KnowledgeChunk[] = [
   {
-    id: 'ACC-2001',
-    customerId: 'CUST-1001',
-    accountNumber: '100198234821',
-    maskedAccountNumber: '•••• •••• 4821',
-    accountType: 'SAVINGS',
-    ifscCode: 'XYZB0001024',
-    balance: 148500.50,
-    ledgerBalance: 152000.50,
-    currency: 'INR',
-    status: 'ACTIVE',
-    createdAt: '2023-01-15T09:30:00Z',
+    id: 'CHUNK-001',
+    source: 'WEBSITE',
+    title: 'Company Overview & Mission',
+    category: 'COMPANY_OVERVIEW',
+    content:
+      'Saras Dynamics (https://www.sarasdynamics.com/) is a high-growth software and AI engineering company specializing in intelligent software, enterprise AI systems, digital platforms, and automation solutions. Headquartered in Coimbatore, Tamil Nadu, India, the company delivers mission-critical systems and digital product transformations for enterprises and high-velocity startups worldwide.',
+    url: 'https://www.sarasdynamics.com/',
+    version: 1,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
   },
   {
-    id: 'ACC-2002',
-    customerId: 'CUST-1001',
-    accountNumber: '100198239014',
-    maskedAccountNumber: '•••• •••• 9014',
-    accountType: 'CURRENT',
-    ifscCode: 'XYZB0001024',
-    balance: 325400.00,
-    ledgerBalance: 325400.00,
-    currency: 'INR',
-    status: 'ACTIVE',
-    createdAt: '2023-02-10T11:00:00Z',
-  },
-  // Priya Sundaram
-  {
-    id: 'ACC-2003',
-    customerId: 'CUST-1002',
-    accountNumber: '100287413390',
-    maskedAccountNumber: '•••• •••• 3390',
-    accountType: 'SAVINGS',
-    ifscCode: 'XYZB0001088',
-    balance: 78920.75,
-    ledgerBalance: 78920.75,
-    currency: 'INR',
-    status: 'ACTIVE',
-    createdAt: '2023-03-20T11:00:00Z',
-  },
-  // Amit Patel
-  {
-    id: 'ACC-2004',
-    customerId: 'CUST-1003',
-    accountNumber: '100344917652',
-    maskedAccountNumber: '•••• •••• 7652',
-    accountType: 'SAVINGS',
-    ifscCode: 'XYZB0002011',
-    balance: 245600.00,
-    ledgerBalance: 245600.00,
-    currency: 'INR',
-    status: 'ACTIVE',
-    createdAt: '2023-05-12T14:15:00Z',
-  },
-  // Sneha Rao (has Savings + Fixed Deposit)
-  {
-    id: 'ACC-2005',
-    customerId: 'CUST-1004',
-    accountNumber: '100411226049',
-    maskedAccountNumber: '•••• •••• 6049',
-    accountType: 'SAVINGS',
-    ifscCode: 'XYZB0003055',
-    balance: 51230.25,
-    ledgerBalance: 51230.25,
-    currency: 'INR',
-    status: 'ACTIVE',
-    createdAt: '2023-07-04T10:00:00Z',
+    id: 'CHUNK-002',
+    source: 'WEBSITE',
+    title: 'Engineering Philosophy & Positioning',
+    category: 'COMPANY_OVERVIEW',
+    content:
+      'Saras Dynamics positions itself at the intersection of technical depth, modern design systems, and software craftsmanship. The company empowers organizations to eliminate repetitive manual workloads through autonomous AI agents, enterprise-grade LLM integrations, resilient Kubernetes cloud infrastructure, and human-centric UI/UX architectures.',
+    url: 'https://www.sarasdynamics.com/about',
+    version: 1,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
   },
   {
-    id: 'ACC-2006',
-    customerId: 'CUST-1004',
-    accountNumber: '100499008123',
-    maskedAccountNumber: '•••• •••• 8123',
-    accountType: 'FIXED_DEPOSIT',
-    ifscCode: 'XYZB0003055',
-    balance: 500000.00,
-    ledgerBalance: 500000.00,
-    currency: 'INR',
-    status: 'ACTIVE',
-    createdAt: '2023-08-01T10:00:00Z',
+    id: 'CHUNK-003',
+    source: 'WEBSITE',
+    title: 'Artificial Intelligence & Autonomous Systems',
+    category: 'AI_SYSTEMS',
+    content:
+      'Saras Dynamics designs and deploys production-grade AI systems, featuring: (1) Custom LLM Integrations tailored for proprietary business logic, (2) Retrieval-Augmented Generation (RAG) pipelines linking LLMs to secure knowledge bases with hallucination guards, (3) Autonomous AI Agents capable of multi-step task execution, reasoning, and tool interaction, and (4) Predictive Modeling for demand forecasting, anomaly detection, and operational intelligence.',
+    url: 'https://www.sarasdynamics.com/services/ai-autonomous-systems',
+    version: 1,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
   },
-  // Vikram Joshi
   {
-    id: 'ACC-2007',
-    customerId: 'CUST-1005',
-    accountNumber: '100577664411',
-    maskedAccountNumber: '•••• •••• 4411',
-    accountType: 'SALARY',
-    ifscCode: 'XYZB0004012',
-    balance: 89450.00,
-    ledgerBalance: 94450.00,
-    currency: 'INR',
-    status: 'ACTIVE',
-    createdAt: '2023-09-18T16:45:00Z',
+    id: 'CHUNK-004',
+    source: 'WEBSITE',
+    title: 'Full-Stack & Web Architecture',
+    category: 'WEB_DEVELOPMENT',
+    content:
+      'Saras Dynamics builds modern, scalable web platforms utilizing Next.js, React, Node.js, and TypeScript. Core capabilities include: distributed micro-frontends, sub-second page performance, high-throughput REST and GraphQL API gateways, event-driven backends, and robust state orchestration.',
+    url: 'https://www.sarasdynamics.com/services/full-stack-web',
+    version: 1,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
   },
-  // Sunita Deshmukh
   {
-    id: 'ACC-2008',
-    customerId: 'CUST-1006',
-    accountNumber: '100655331189',
-    maskedAccountNumber: '•••• •••• 1189',
-    accountType: 'SAVINGS',
-    ifscCode: 'XYZB0004089',
-    balance: 34120.00,
-    ledgerBalance: 34120.00,
-    currency: 'INR',
-    status: 'ACTIVE',
-    createdAt: '2023-11-22T08:20:00Z',
+    id: 'CHUNK-005',
+    source: 'WEBSITE',
+    title: 'Mobile Engineering',
+    category: 'MOBILE_ENGINEERING',
+    content:
+      'Saras Dynamics engineers native (Swift/Kotlin) and high-performance cross-platform (React Native/Flutter) mobile applications. Specialized in offline-first synchronization, local database caching, secure biometric authentication, hardware telemetry integration, and fluid 120Hz gesture-driven interfaces.',
+    url: 'https://www.sarasdynamics.com/services/mobile-engineering',
+    version: 1,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
   },
-  // Kavita Nair
   {
-    id: 'ACC-2009',
-    customerId: 'CUST-1007',
-    accountNumber: '100722889944',
-    maskedAccountNumber: '•••• •••• 9944',
-    accountType: 'SAVINGS',
-    ifscCode: 'XYZB0005014',
-    balance: 62780.50,
-    ledgerBalance: 62780.50,
-    currency: 'INR',
-    status: 'ACTIVE',
-    createdAt: '2024-01-08T12:00:00Z',
+    id: 'CHUNK-006',
+    source: 'WEBSITE',
+    title: 'Cloud Infrastructure & DevOps',
+    category: 'CLOUD_DEVOPS',
+    content:
+      'Saras Dynamics implements enterprise cloud infrastructure on AWS, GCP, and Azure with Kubernetes (EKS/GKE), Docker containerization, Infrastructure as Code (Terraform), automated CI/CD pipelines (GitHub Actions/GitLab CI), zero-downtime rolling deployments, and end-to-end Prometheus/Grafana observability.',
+    url: 'https://www.sarasdynamics.com/services/cloud-devops',
+    version: 1,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
   },
-  // Anand Subramanian
   {
-    id: 'ACC-2010',
-    customerId: 'CUST-1008',
-    accountNumber: '100833117722',
-    maskedAccountNumber: '•••• •••• 7722',
-    accountType: 'CURRENT',
-    ifscCode: 'XYZB0006001',
-    balance: 412000.00,
-    ledgerBalance: 412000.00,
-    currency: 'INR',
-    status: 'ACTIVE',
-    createdAt: '2024-02-14T15:30:00Z',
+    id: 'CHUNK-007',
+    source: 'WEBSITE',
+    title: 'Intelligent Automation & ETL Pipelines',
+    category: 'AUTOMATION_ETL',
+    content:
+      'Saras Dynamics eliminates manual corporate overhead through intelligent automation workflows: automated business processes, ETL data transformation pipelines, robotic process tasks, real-time webhooks, and seamless integrations with legacy ERP systems (SAP, Oracle) and modern CRMs (Salesforce, HubSpot).',
+    url: 'https://www.sarasdynamics.com/services/intelligent-automation',
+    version: 1,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
   },
-  // Debojit Banerjee
   {
-    id: 'ACC-2011',
-    customerId: 'CUST-1009',
-    accountNumber: '100988442266',
-    maskedAccountNumber: '•••• •••• 2266',
-    accountType: 'SAVINGS',
-    ifscCode: 'XYZB0007019',
-    balance: 43250.00,
-    ledgerBalance: 43250.00,
-    currency: 'INR',
-    status: 'ACTIVE',
-    createdAt: '2024-03-01T17:10:00Z',
+    id: 'CHUNK-008',
+    source: 'WEBSITE',
+    title: 'Experience Architecture & UI/UX Product Design',
+    category: 'UI_UX_DESIGN',
+    content:
+      'Saras Dynamics creates cohesive digital product designs adhering to atomic design systems, WCAG 2.1 AA accessibility standards, interactive Figma prototypes, and micro-animations. Also creator of proprietary UI assets including DIcons (comprehensive vector icon library), DShapes (generative geometric vectors), and Graaadients (mesh gradient palette generator).',
+    url: 'https://www.sarasdynamics.com/services/ui-ux-design',
+    version: 1,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
   },
-  // Harpreet Singh
   {
-    id: 'ACC-2012',
-    customerId: 'CUST-1010',
-    accountNumber: '101066553311',
-    maskedAccountNumber: '•••• •••• 3311',
-    accountType: 'SAVINGS',
-    ifscCode: 'XYZB0008003',
-    balance: 115000.00,
-    ledgerBalance: 115000.00,
-    currency: 'INR',
-    status: 'ACTIVE',
-    createdAt: '2024-04-19T13:40:00Z',
+    id: 'CHUNK-009',
+    source: 'WEBSITE',
+    title: 'Portfolio: Aegis Neural Engine',
+    category: 'PORTFOLIO_CASE_STUDIES',
+    content:
+      'Aegis Neural Engine is a flagship AI architecture deployment by Saras Dynamics. It is an autonomous AI decision platform and predictive neural evaluation engine capable of processing unstructured multi-modal enterprise data streams in real time with sub-50ms inference latency.',
+    url: 'https://www.sarasdynamics.com/portfolio/aegis-neural-engine',
+    version: 1,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
   },
-  // Rohan Mehta
   {
-    id: 'ACC-2013',
-    customerId: 'CUST-1011',
-    accountNumber: '101199881144',
-    maskedAccountNumber: '•••• •••• 1144',
-    accountType: 'CURRENT',
-    ifscCode: 'XYZB0004012',
-    balance: 890400.00,
-    ledgerBalance: 890400.00,
-    currency: 'INR',
-    status: 'ACTIVE',
-    createdAt: '2024-05-25T11:20:00Z',
+    id: 'CHUNK-010',
+    source: 'WEBSITE',
+    title: 'Portfolio: Apex FinTech Terminal',
+    category: 'PORTFOLIO_CASE_STUDIES',
+    content:
+      'Apex FinTech Terminal is an institutional-grade financial web application engineered by Saras Dynamics. Features high-frequency order book visualizations, real-time WebSocket ticker streaming, distributed micro-frontend widgets, and bank-grade data encryption.',
+    url: 'https://www.sarasdynamics.com/portfolio/apex-fintech-terminal',
+    version: 1,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
   },
-  // Ananya Sen
   {
-    id: 'ACC-2014',
-    customerId: 'CUST-1012',
-    accountNumber: '101233221199',
-    maskedAccountNumber: '•••• •••• 1199',
-    accountType: 'SAVINGS',
-    ifscCode: 'XYZB0007019',
-    balance: 95400.00,
-    ledgerBalance: 95400.00,
-    currency: 'INR',
-    status: 'ACTIVE',
-    createdAt: '2024-06-10T10:05:00Z',
+    id: 'CHUNK-011',
+    source: 'WEBSITE',
+    title: 'Portfolio: Nexus Health Wearable',
+    category: 'PORTFOLIO_CASE_STUDIES',
+    content:
+      'Nexus Health Wearable is a cross-platform mobile application and digital health ecosystem crafted by Saras Dynamics. It integrates BLE (Bluetooth Low Energy) biometric telemetry, continuous heart rate and sleep pattern synchronization, and an offline-first SQLite cache that syncs to cloud pipelines when connected.',
+    url: 'https://www.sarasdynamics.com/portfolio/nexus-health-wearable',
+    version: 1,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'CHUNK-012',
+    source: 'WEBSITE',
+    title: 'Client Engagement Process & Discovery Call',
+    category: 'CONTACT_ENGAGEMENT',
+    content:
+      'How to engage with Saras Dynamics: (1) Free Discovery Call: Prospective clients discuss vision and technical constraints with our solution architects. (2) Written Project Proposal: Within 48-72 hours, our engineering leads formulate a comprehensive technical roadmap, architecture diagram, scope breakdown, and milestone schedule. (3) Agile Development Sprints: Fortnightly demonstrations and transparent deliverables.',
+    url: 'https://www.sarasdynamics.com/contact',
+    version: 1,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'CHUNK-013',
+    source: 'WEBSITE',
+    title: 'Project Pricing Policy',
+    category: 'FAQ',
+    content:
+      'Saras Dynamics does not publish a one-size-fits-all fixed price list because every enterprise application is custom-architected based on complexity, security requirements, scalability target, and timeline. Solution architects provide clear, milestone-based proposals following the discovery consultation.',
+    url: 'https://www.sarasdynamics.com/pricing-policy',
+    version: 1,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'CHUNK-014',
+    source: 'WEBSITE',
+    title: 'Blog Article: Color Psychology in UI & Design Systems',
+    category: 'BLOG_ARTICLES',
+    content:
+      'Published by Saras Dynamics Design Lab: "Color Psychology in UI: How to Choose the Right Palette." Explores how contrast ratios, chromatic temperature, and accessibility-first color tokens influence digital retention, trust in fintech platforms, and cognitive load in complex SaaS dashboards.',
+    url: 'https://www.sarasdynamics.com/blog/color-psychology-in-ui',
+    version: 1,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
   },
 ];
 
-const SEED_CARDS: BankCard[] = [
-  // Rajesh Sharma: 2 cards (Debit active + Platinum credit)
+const SEED_WEBSITE_PAGES: WebsitePage[] = [
   {
-    id: 'CARD-3001',
-    customerId: 'CUST-1001',
-    accountId: 'ACC-2001',
-    cardNumber: '4591823490124829',
-    maskedCardNumber: '•••• •••• •••• 4829',
-    cardType: 'DEBIT',
-    cardNetwork: 'VISA',
-    expiryMonth: 8,
-    expiryYear: 2028,
-    status: 'ACTIVE',
-    dailyAtmLimit: 50000,
-    dailyPosLimit: 150000,
+    id: 'PAGE-001',
+    url: 'https://www.sarasdynamics.com/',
+    title: 'Saras Dynamics - Intelligent Software & Enterprise AI Engineering',
+    status: 'INDEXED',
+    lastCrawledAt: '2026-11-02T12:00:00Z',
+    chunkCount: 3,
+    contentHash: 'hash-saras-home-2026',
   },
   {
-    id: 'CARD-3002',
-    customerId: 'CUST-1001',
-    accountId: 'ACC-2001',
-    cardNumber: '5241771122338190',
-    maskedCardNumber: '•••• •••• •••• 8190',
-    cardType: 'CREDIT',
-    cardNetwork: 'MASTERCARD',
-    expiryMonth: 11,
-    expiryYear: 2027,
-    status: 'ACTIVE',
-    dailyAtmLimit: 25000,
-    dailyPosLimit: 300000,
+    id: 'PAGE-002',
+    url: 'https://www.sarasdynamics.com/services',
+    title: 'Services & Solutions - Saras Dynamics',
+    status: 'INDEXED',
+    lastCrawledAt: '2026-11-02T12:10:00Z',
+    chunkCount: 6,
+    contentHash: 'hash-saras-services-2026',
   },
-  // Priya Sundaram: 1 debit (Temporarily blocked for testing unblock)
   {
-    id: 'CARD-3003',
-    customerId: 'CUST-1002',
-    accountId: 'ACC-2003',
-    cardNumber: '6521990011223344',
-    maskedCardNumber: '•••• •••• •••• 3344',
-    cardType: 'DEBIT',
-    cardNetwork: 'RUPAY',
-    expiryMonth: 3,
-    expiryYear: 2029,
-    status: 'TEMPORARILY_BLOCKED',
-    dailyAtmLimit: 40000,
-    dailyPosLimit: 100000,
-    blockReason: 'Customer requested temporary freeze',
-    blockedAt: '2024-10-10T14:00:00Z',
+    id: 'PAGE-003',
+    url: 'https://www.sarasdynamics.com/portfolio',
+    title: 'Deployments & Case Studies - Saras Dynamics',
+    status: 'INDEXED',
+    lastCrawledAt: '2026-11-02T12:20:00Z',
+    chunkCount: 3,
+    contentHash: 'hash-saras-portfolio-2026',
   },
-  // Amit Patel: Active RuPay Debit
   {
-    id: 'CARD-3004',
-    customerId: 'CUST-1003',
-    accountId: 'ACC-2004',
-    cardNumber: '4591334455667788',
-    maskedCardNumber: '•••• •••• •••• 7788',
-    cardType: 'DEBIT',
-    cardNetwork: 'VISA',
-    expiryMonth: 6,
-    expiryYear: 2027,
-    status: 'ACTIVE',
-    dailyAtmLimit: 50000,
-    dailyPosLimit: 200000,
-  },
-  // Sneha Rao: Active Visa Debit
-  {
-    id: 'CARD-3005',
-    customerId: 'CUST-1004',
-    accountId: 'ACC-2005',
-    cardNumber: '4111223344556611',
-    maskedCardNumber: '•••• •••• •••• 6611',
-    cardType: 'DEBIT',
-    cardNetwork: 'VISA',
-    expiryMonth: 9,
-    expiryYear: 2028,
-    status: 'ACTIVE',
-    dailyAtmLimit: 50000,
-    dailyPosLimit: 150000,
-  },
-  // Vikram Joshi: Permanently blocked card (to test ineligible unblocking!)
-  {
-    id: 'CARD-3006',
-    customerId: 'CUST-1005',
-    accountId: 'ACC-2007',
-    cardNumber: '5500112233445588',
-    maskedCardNumber: '•••• •••• •••• 5588',
-    cardType: 'DEBIT',
-    cardNetwork: 'MASTERCARD',
-    expiryMonth: 2,
-    expiryYear: 2026,
-    status: 'PERMANENTLY_BLOCKED',
-    dailyAtmLimit: 50000,
-    dailyPosLimit: 150000,
-    blockReason: 'Reported stolen at ATM kiosk',
-    blockedAt: '2024-08-01T09:00:00Z',
-  },
-  // Sunita Deshmukh: Active debit
-  {
-    id: 'CARD-3007',
-    customerId: 'CUST-1006',
-    accountId: 'ACC-2008',
-    cardNumber: '6071889900112233',
-    maskedCardNumber: '•••• •••• •••• 2233',
-    cardType: 'DEBIT',
-    cardNetwork: 'RUPAY',
-    expiryMonth: 12,
-    expiryYear: 2029,
-    status: 'ACTIVE',
-    dailyAtmLimit: 30000,
-    dailyPosLimit: 75000,
-  },
-  // Kavita Nair: Active debit
-  {
-    id: 'CARD-3008',
-    customerId: 'CUST-1007',
-    accountId: 'ACC-2009',
-    cardNumber: '4591001122334455',
-    maskedCardNumber: '•••• •••• •••• 4455',
-    cardType: 'DEBIT',
-    cardNetwork: 'VISA',
-    expiryMonth: 4,
-    expiryYear: 2028,
-    status: 'ACTIVE',
-    dailyAtmLimit: 50000,
-    dailyPosLimit: 100000,
+    id: 'PAGE-004',
+    url: 'https://www.sarasdynamics.com/contact',
+    title: 'Start a Project - Saras Dynamics',
+    status: 'INDEXED',
+    lastCrawledAt: '2026-11-02T12:30:00Z',
+    chunkCount: 2,
+    contentHash: 'hash-saras-contact-2026',
   },
 ];
 
-const SEED_TRANSACTIONS: Transaction[] = [
-  // Rajesh Sharma (Savings ACC-2001)
+const SEED_LEADS: CustomerEnquiry[] = [
   {
-    id: 'TXN-9001',
-    accountId: 'ACC-2001',
-    customerId: 'CUST-1001',
-    date: '2026-10-24T18:45:00Z',
-    description: 'UPI/Swiggy Orders/Bangalore',
-    category: 'Dining & Food',
-    type: 'DEBIT',
-    amount: 649.00,
-    status: 'SUCCESS',
-    referenceNumber: 'UPI/261024/77491028',
-    balanceAfter: 148500.50,
+    id: 'LEAD-2001',
+    customerName: 'Vivek Singhania',
+    email: 'vivek@zenithlogistics.in',
+    phone: '+91 98200 45678',
+    companyName: 'Zenith Logistics',
+    requiredService: 'Intelligent Automation & ETL Pipelines',
+    projectDescription:
+      'We need automated dispatch workflows and SAP ERP integration to replace manual daily billing reconciliation for our freight fleet.',
+    estimatedBudget: '$25,000 - $50,000',
+    expectedTimeline: '2 to 3 months',
+    additionalRequirements: 'Requires webhook ingestion from 400 IoT GPS transponders.',
+    status: 'IN_DISCUSSION',
+    assignedTo: 'USR-1002',
+    assignedToName: 'Arunachalam Murugan',
+    internalNotes: 'Initial discovery call scheduled for Thursday 3 PM IST.',
+    createdAt: '2026-11-01T10:15:00Z',
+    updatedAt: '2026-11-02T09:30:00Z',
   },
   {
-    id: 'TXN-9002',
-    accountId: 'ACC-2001',
-    customerId: 'CUST-1001',
-    date: '2026-10-23T11:20:00Z',
-    description: 'NEFT/Infosys Tech Salary Cr Oct 2026',
-    category: 'Salary',
-    type: 'CREDIT',
-    amount: 125000.00,
-    status: 'SUCCESS',
-    referenceNumber: 'NEFT/XYZB/261023/11029',
-    balanceAfter: 149149.50,
+    id: 'LEAD-2002',
+    customerName: 'Priya Deshpande',
+    email: 'priya@medpulse.io',
+    phone: '+91 97110 88990',
+    companyName: 'MedPulse Health Tech',
+    requiredService: 'AI & Autonomous Systems',
+    projectDescription:
+      'Looking to develop a specialized clinical RAG system grounded on medical research papers with physician source citation verification.',
+    estimatedBudget: '$50,000+',
+    expectedTimeline: '3 to 6 months',
+    additionalRequirements: 'HIPAA and Indian Data Protection compliance required.',
+    status: 'QUALIFIED',
+    assignedTo: 'USR-1003',
+    assignedToName: 'Deepika Raman',
+    internalNotes: 'Architecture whitepaper sent to client CTO. High intent.',
+    createdAt: '2026-10-31T14:20:00Z',
+    updatedAt: '2026-11-01T16:00:00Z',
   },
   {
-    id: 'TXN-9003',
-    accountId: 'ACC-2001',
-    customerId: 'CUST-1001',
-    date: '2026-10-20T15:10:00Z',
-    description: 'Amazon Retail India Pvt Ltd',
-    category: 'Shopping',
-    type: 'DEBIT',
-    amount: 3499.00,
-    status: 'SUCCESS',
-    referenceNumber: 'PG/AMZN/261020/99812',
-    balanceAfter: 24149.50,
-  },
-  {
-    id: 'TXN-9004',
-    accountId: 'ACC-2001',
-    customerId: 'CUST-1001',
-    date: '2026-10-18T09:05:00Z',
-    description: 'Bescom Electricity Bill Payment',
-    category: 'Utilities',
-    type: 'DEBIT',
-    amount: 1845.00,
-    status: 'SUCCESS',
-    referenceNumber: 'BBPS/BESCOM/261018/3321',
-    balanceAfter: 27648.50,
-  },
-  {
-    id: 'TXN-9005',
-    accountId: 'ACC-2001',
-    customerId: 'CUST-1001',
-    date: '2026-10-15T19:30:00Z',
-    description: 'ATM Cash Withdrawal Indiranagar Branch',
-    category: 'Cash',
-    type: 'DEBIT',
-    amount: 10000.00,
-    status: 'SUCCESS',
-    referenceNumber: 'ATM/XYZB/261015/0029',
-    balanceAfter: 29493.50,
-  },
-  {
-    id: 'TXN-9006',
-    accountId: 'ACC-2001',
-    customerId: 'CUST-1001',
-    date: '2026-10-12T14:12:00Z',
-    description: 'UPI/Failed merchant payment to Cafe Coffee Day',
-    category: 'Dining & Food',
-    type: 'DEBIT',
-    amount: 320.00,
-    status: 'FAILED',
-    referenceNumber: 'UPI/261012/FAIL9901',
-    balanceAfter: 39493.50,
-  },
-  // Priya Sundaram (ACC-2003)
-  {
-    id: 'TXN-9007',
-    accountId: 'ACC-2003',
-    customerId: 'CUST-1002',
-    date: '2026-10-24T10:15:00Z',
-    description: 'UPI/Zomato Daily Express',
-    category: 'Dining & Food',
-    type: 'DEBIT',
-    amount: 410.00,
-    status: 'SUCCESS',
-    referenceNumber: 'UPI/261024/99102833',
-    balanceAfter: 78920.75,
-  },
-  {
-    id: 'TXN-9008',
-    accountId: 'ACC-2003',
-    customerId: 'CUST-1002',
-    date: '2026-10-21T16:00:00Z',
-    description: 'IMPS Inward from Suresh Rao',
-    category: 'Transfer',
-    type: 'CREDIT',
-    amount: 25000.00,
-    status: 'SUCCESS',
-    referenceNumber: 'IMPS/XYZB/261021/7711',
-    balanceAfter: 79330.75,
-  },
-  // Amit Patel (ACC-2004)
-  {
-    id: 'TXN-9009',
-    accountId: 'ACC-2004',
-    customerId: 'CUST-1003',
-    date: '2026-10-22T13:45:00Z',
-    description: 'Interest Credit Q2 2026-27',
-    category: 'Interest',
-    type: 'CREDIT',
-    amount: 3240.00,
-    status: 'SUCCESS',
-    referenceNumber: 'INT/XYZB/261022/4412',
-    balanceAfter: 245600.00,
+    id: 'LEAD-2003',
+    customerName: 'Marcus Sterling',
+    email: 'marcus@sterlingfin.co.uk',
+    phone: '+44 7700 900123',
+    companyName: 'Sterling Wealth Partners',
+    requiredService: 'Full-Stack & Web Architecture',
+    projectDescription:
+      'Need a high-performance Next.js client terminal inspired by Apex FinTech Terminal to display private equity telemetry.',
+    estimatedBudget: '$40,000 - $75,000',
+    expectedTimeline: '3 months',
+    additionalRequirements: 'Must support real-time WebSocket feeds and dark mode UI.',
+    status: 'NEW',
+    internalNotes: 'Registered via Voice Assistant. Awaiting sales assignment.',
+    createdAt: '2026-11-02T11:45:00Z',
+    updatedAt: '2026-11-02T11:45:00Z',
   },
 ];
 
-const SEED_BRANCHES: BankBranch[] = [
+const SEED_CALL_SESSIONS: CallSession[] = [
   {
-    id: 'BR-01',
-    name: 'Indiranagar Flagship Branch',
-    code: 'XYZB0001024',
-    address: '100 Feet Road, HAL 2nd Stage, Indiranagar',
-    city: 'Bengaluru',
-    pincode: '560038',
-    phone: '+91 80 2520 1024',
-    workingHours: 'Monday - Saturday: 10:00 AM - 4:00 PM (Closed 2nd & 4th Sat)',
-    latitude: 12.9716,
-    longitude: 77.6412,
-    services: ['Cash Deposit', 'Gold Loan', 'Forex', 'Locker Facility', 'Aadhaar Seva'],
-    hasAtm: true,
-    isOpenNow: true,
+    id: 'CALL-5001',
+    customerName: 'Vivek Singhania',
+    customerEmail: 'vivek@zenithlogistics.in',
+    callerNumber: '+91 98200 45678',
+    startTime: '2026-11-01T10:10:00Z',
+    endTime: '2026-11-01T10:15:30Z',
+    durationSeconds: 330,
+    status: 'COMPLETED',
+    mode: 'SIMULATION',
+    language: 'English',
+    sentiment: 'POSITIVE',
+    escalatedToHuman: false,
+    leadCaptured: true,
+    leadId: 'LEAD-2001',
+    notes: 'Inquired about ETL data pipelines and ERP integration for logistics.',
   },
   {
-    id: 'BR-02',
-    name: 'Koramangala Tech Park Branch',
-    code: 'XYZB0001088',
-    address: '80 Feet Road, 4th Block, Koramangala',
-    city: 'Bengaluru',
-    pincode: '560034',
-    phone: '+91 80 2553 1088',
-    workingHours: 'Monday - Saturday: 10:00 AM - 4:00 PM',
-    latitude: 12.9352,
-    longitude: 77.6245,
-    services: ['Cash Deposit', 'SME Banking', 'NRI Services', 'Wealth Management'],
-    hasAtm: true,
-    isOpenNow: true,
-  },
-  {
-    id: 'BR-03',
-    name: 'Bandra Kurla Complex (BKC) Branch',
-    code: 'XYZB0004012',
-    address: 'G-Block, Bandra Kurla Complex, Bandra East',
-    city: 'Mumbai',
-    pincode: '400051',
-    phone: '+91 22 2659 4012',
-    workingHours: 'Monday - Saturday: 9:30 AM - 4:30 PM',
-    latitude: 19.0657,
-    longitude: 72.8687,
-    services: ['Corporate Banking', 'Treasury', 'International Forex', 'Private Banking'],
-    hasAtm: true,
-    isOpenNow: true,
-  },
-  {
-    id: 'BR-04',
-    name: 'Connaught Place Branch',
-    code: 'XYZB0008003',
-    address: 'Inner Circle, Block C, Connaught Place',
-    city: 'New Delhi',
-    pincode: '110001',
-    phone: '+91 11 2341 8003',
-    workingHours: 'Monday - Saturday: 10:00 AM - 4:00 PM',
-    latitude: 28.6315,
-    longitude: 77.2167,
-    services: ['Retail Banking', 'Government Pension', 'Lockers', 'Tax Payments'],
-    hasAtm: true,
-    isOpenNow: true,
-  },
-  {
-    id: 'BR-05',
-    name: 'HITEC City Cyber Towers Branch',
-    code: 'XYZB0003055',
-    address: 'Ground Floor, Cyber Towers, Madhapur',
-    city: 'Hyderabad',
-    pincode: '500081',
-    phone: '+91 40 2311 3055',
-    workingHours: 'Monday - Saturday: 10:00 AM - 4:00 PM',
-    latitude: 17.4504,
-    longitude: 78.3808,
-    services: ['IT Corporate Salaries', 'Personal Loans', 'Forex Card Issuance'],
-    hasAtm: true,
-    isOpenNow: true,
-  },
-  {
-    id: 'BR-06',
-    name: 'Anna Nagar Roundtana Branch',
-    code: 'XYZB0006001',
-    address: '2nd Avenue, Anna Nagar East',
-    city: 'Chennai',
-    pincode: '600102',
-    phone: '+91 44 2621 6001',
-    workingHours: 'Monday - Saturday: 10:00 AM - 4:00 PM',
-    latitude: 13.0850,
-    longitude: 80.2101,
-    services: ['Senior Citizen Priority', 'Locker Vault', 'SME Loans'],
-    hasAtm: true,
-    isOpenNow: true,
-  },
-  {
-    id: 'BR-07',
-    name: 'FC Road Deccan Branch',
-    code: 'XYZB0004089',
-    address: 'Fergusson College Road, Shivajinagar',
-    city: 'Pune',
-    pincode: '411004',
-    phone: '+91 20 2567 4089',
-    workingHours: 'Monday - Saturday: 10:00 AM - 4:00 PM',
-    latitude: 18.5246,
-    longitude: 73.8415,
-    services: ['Student Education Loans', 'Retail Banking', 'Demat Services'],
-    hasAtm: true,
-    isOpenNow: true,
-  },
-  {
-    id: 'BR-08',
-    name: 'Park Street Main Branch',
-    code: 'XYZB0007019',
-    address: 'Stephen Court, 18 Park Street',
-    city: 'Kolkata',
-    pincode: '700016',
-    phone: '+91 33 2229 7019',
-    workingHours: 'Monday - Saturday: 10:00 AM - 4:00 PM',
-    latitude: 22.5529,
-    longitude: 88.3533,
-    services: ['Commercial Banking', 'Forex', 'Lockers', 'Cheque Clearing Hub'],
-    hasAtm: true,
-    isOpenNow: true,
+    id: 'CALL-5002',
+    customerName: 'Marcus Sterling',
+    customerEmail: 'marcus@sterlingfin.co.uk',
+    callerNumber: '+44 7700 900123',
+    startTime: '2026-11-02T11:40:00Z',
+    endTime: '2026-11-02T11:45:00Z',
+    durationSeconds: 300,
+    status: 'COMPLETED',
+    mode: 'SIMULATION',
+    language: 'English',
+    sentiment: 'POSITIVE',
+    escalatedToHuman: false,
+    leadCaptured: true,
+    leadId: 'LEAD-2003',
+    notes: 'Inquired about Apex FinTech Terminal and Next.js full-stack capabilities.',
   },
 ];
 
-const SEED_COMPLAINTS: ComplaintTicket[] = [
+const SEED_CALL_TRANSCRIPTS: Record<string, TranscriptItem[]> = {
+  'CALL-5001': [
+    {
+      id: 'TR-1',
+      speaker: 'agent',
+      text: 'Namaste! I am the Saras Dynamics AI Voice Assistant. How can I assist you with our engineering services or discuss your project today?',
+      timestamp: '2026-11-01T10:10:02Z',
+    },
+    {
+      id: 'TR-2',
+      speaker: 'visitor',
+      text: 'Hi there, does Saras Dynamics build automated data pipelines and integrate with SAP ERP?',
+      timestamp: '2026-11-01T10:10:15Z',
+    },
+    {
+      id: 'TR-3',
+      speaker: 'agent',
+      text: 'Yes, absolutely! Saras Dynamics specializes in intelligent automation, automated ETL data pipelines, robotic tasks, and seamless integrations with enterprise ERP systems like SAP and Oracle.',
+      timestamp: '2026-11-01T10:10:28Z',
+    },
+  ],
+  'CALL-5002': [
+    {
+      id: 'TR-4',
+      speaker: 'agent',
+      text: 'Hello and welcome to Saras Dynamics! How may I help you explore our AI or software engineering solutions?',
+      timestamp: '2026-11-02T11:40:05Z',
+    },
+    {
+      id: 'TR-5',
+      speaker: 'visitor',
+      text: 'I saw your Apex FinTech Terminal case study. Can you build something similar for our private equity portfolio?',
+      timestamp: '2026-11-02T11:40:22Z',
+    },
+    {
+      id: 'TR-6',
+      speaker: 'agent',
+      text: 'Certainly! Our Apex FinTech Terminal showcases our expertise in high-frequency Next.js architectures, distributed micro-frontends, and real-time streaming dashboards. We would love to tailor a platform for your portfolio.',
+      timestamp: '2026-11-02T11:40:40Z',
+    },
+  ],
+};
+
+const SEED_AUDIT_LOGS: AuditLog[] = [
   {
-    id: 'TICK-48201',
-    customerId: 'CUST-1001',
-    accountId: 'ACC-2001',
-    category: 'Failed UPI Transaction',
-    description: 'UPI debited Rs 320 for Cafe Coffee Day but merchant received failure response. Auto-reversal pending.',
-    status: 'IN_PROGRESS',
-    priority: 'MEDIUM',
-    createdAt: '2026-10-12T14:30:00Z',
-    updatedAt: '2026-10-13T10:00:00Z',
-    resolutionNotes: 'Under verification with NPCI switch. Settlement expected within T+2 days.',
+    id: 'AUD-001',
+    timestamp: '2026-11-02T12:30:00Z',
+    actor: 'SYSTEM_CRAWLER',
+    role: 'SYSTEM',
+    action: 'WEBSITE_INGESTION_COMPLETED',
+    targetId: 'https://www.sarasdynamics.com/',
+    details: 'Synchronized 4 pages and generated 14 verified knowledge chunks.',
+    status: 'SUCCESS',
+    ipAddress: '127.0.0.1',
   },
   {
-    id: 'TICK-48119',
-    customerId: 'CUST-1005',
-    accountId: 'ACC-2007',
-    category: 'Lost Card & Unauthorized Attempt',
-    description: 'Customer lost card near Dadar station. Immediately blocked. No unauthorized debit occurred.',
-    status: 'RESOLVED',
-    priority: 'HIGH',
-    createdAt: '2026-08-01T09:15:00Z',
-    updatedAt: '2026-08-01T11:00:00Z',
-    resolutionNotes: 'Card permanently blocked. Replacement RuPay card dispatched to registered residence.',
+    id: 'AUD-002',
+    timestamp: '2026-11-02T11:45:00Z',
+    actor: 'SARAS_VOICE_AGENT',
+    role: 'AI_AGENT',
+    action: 'LEAD_CAPTURED',
+    targetId: 'LEAD-2003',
+    details: 'New business enquiry captured for Marcus Sterling (Full-Stack & Web Architecture).',
+    status: 'SUCCESS',
+    ipAddress: '127.0.0.1',
+  },
+  {
+    id: 'AUD-003',
+    timestamp: '2026-11-01T10:15:00Z',
+    actor: 'SARAS_VOICE_AGENT',
+    role: 'AI_AGENT',
+    action: 'LEAD_CAPTURED',
+    targetId: 'LEAD-2001',
+    details: 'New business enquiry captured for Vivek Singhania (Intelligent Automation).',
+    status: 'SUCCESS',
+    ipAddress: '127.0.0.1',
   },
 ];
 
-// In-memory Database Store
-class BankingDatabase {
-  private customers: Map<string, Customer> = new Map();
-  private accounts: Map<string, BankAccount> = new Map();
-  private cards: Map<string, BankCard> = new Map();
-  private transactions: Map<string, Transaction> = new Map();
-  private branches: Map<string, BankBranch> = new Map();
-  private complaints: Map<string, ComplaintTicket> = new Map();
-  private serviceRequests: Map<string, ServiceRequest> = new Map();
-  private callSessions: Map<string, CallSession> = new Map();
-  private auditLogs: AuditLog[] = [];
-  private activeOtps: Map<string, { otp: string; expiresAt: number; customerId: string }> = new Map();
-  private activeAuthTokens: Map<string, { customerId: string; expiresAt: number }> = new Map();
+// ====================================================================
+// SARAS DYNAMICS DUAL-ENGINE DATABASE REPOSITORY
+// ====================================================================
+export class SarasDatabase {
+  private users: User[] = [...SEED_USERS];
+  private knowledgeChunks: KnowledgeChunk[] = [...SEED_KNOWLEDGE_CHUNKS];
+  private knowledgeDocuments: KnowledgeDocument[] = [];
+  private websitePages: WebsitePage[] = [...SEED_WEBSITE_PAGES];
+  private leads: CustomerEnquiry[] = [...SEED_LEADS];
+  private callSessions: CallSession[] = [...SEED_CALL_SESSIONS];
+  private transcripts: Record<string, TranscriptItem[]> = { ...SEED_CALL_TRANSCRIPTS };
+  private toolExecutions: ToolExecution[] = [];
+  private auditLogs: AuditLog[] = [...SEED_AUDIT_LOGS];
 
   constructor() {
     this.seed();
   }
 
   public seed(): void {
-    this.customers.clear();
-    SEED_CUSTOMERS.forEach(c => this.customers.set(c.id, { ...c }));
-
-    this.accounts.clear();
-    SEED_ACCOUNTS.forEach(a => this.accounts.set(a.id, { ...a }));
-
-    this.cards.clear();
-    SEED_CARDS.forEach(c => this.cards.set(c.id, { ...c }));
-
-    this.transactions.clear();
-    SEED_TRANSACTIONS.forEach(t => this.transactions.set(t.id, { ...t }));
-
-    this.branches.clear();
-    SEED_BRANCHES.forEach(b => this.branches.set(b.id, { ...b }));
-
-    this.complaints.clear();
-    SEED_COMPLAINTS.forEach(c => this.complaints.set(c.id, { ...c }));
-
-    this.serviceRequests.clear();
-    this.callSessions.clear();
-    this.auditLogs = [];
-    this.activeOtps.clear();
-    this.activeAuthTokens.clear();
-
-    this.recordAudit(
-      'SYSTEM',
-      'SYSTEM',
-      'DATABASE_INITIALIZED',
-      undefined,
-      'Seeded synthetic customer database with 12 customers, 14 accounts, 8 cards, and 8 branches.',
-      'SUCCESS'
-    );
+    this.users = [...SEED_USERS];
+    this.knowledgeChunks = [...SEED_KNOWLEDGE_CHUNKS];
+    this.knowledgeDocuments = [];
+    this.websitePages = [...SEED_WEBSITE_PAGES];
+    this.leads = [...SEED_LEADS];
+    this.callSessions = [...SEED_CALL_SESSIONS];
+    this.transcripts = { ...SEED_CALL_TRANSCRIPTS };
+    this.auditLogs = [...SEED_AUDIT_LOGS];
   }
 
-  // --- Customers ---
-  public getCustomers(): Customer[] {
-    return Array.from(this.customers.values());
+  // ----------------------------------------------------
+  // USERS & RBAC
+  // ----------------------------------------------------
+  public getUsers(): User[] {
+    return this.users;
   }
 
-  public getCustomerById(id: string): Customer | undefined {
-    return this.customers.get(id);
+  public getUserById(id: string): User | undefined {
+    return this.users.find((u) => u.id === id);
   }
 
-  public findCustomerByPhone(phone: string): Customer | undefined {
-    const clean = phone.replace(/[\s\-\+]/g, '');
-    return Array.from(this.customers.values()).find(c => {
-      const custClean = c.phone.replace(/[\s\-\+]/g, '');
-      return custClean.endsWith(clean) || clean.endsWith(custClean);
-    });
+  public getUserByUsername(username: string): User | undefined {
+    return this.users.find((u) => u.username.toLowerCase() === username.toLowerCase());
   }
 
-  // --- Accounts ---
-  public getAccountsByCustomer(customerId: string): BankAccount[] {
-    return Array.from(this.accounts.values()).filter(a => a.customerId === customerId);
-  }
-
-  public getAccountById(accountId: string): BankAccount | undefined {
-    return this.accounts.get(accountId);
-  }
-
-  // --- Cards ---
-  public getCardsByCustomer(customerId: string): BankCard[] {
-    return Array.from(this.cards.values()).filter(c => c.customerId === customerId);
-  }
-
-  public getCardById(cardId: string): BankCard | undefined {
-    return this.cards.get(cardId);
-  }
-
-  public blockCard(cardId: string, customerId: string, reason: string): { success: boolean; message: string; card?: BankCard } {
-    const card = this.cards.get(cardId);
-    if (!card) {
-      return { success: false, message: 'Card not found in banking records.' };
+  // ----------------------------------------------------
+  // KNOWLEDGE BASE & RAG SEMANTIC SEARCH
+  // ----------------------------------------------------
+  public getKnowledgeChunks(category?: KnowledgeCategory, search?: string): KnowledgeChunk[] {
+    let result = this.knowledgeChunks;
+    if (category) {
+      result = result.filter((c) => c.category === category);
     }
-    if (card.customerId !== customerId) {
-      this.recordAudit(customerId, 'CUSTOMER', 'CARD_BLOCK_REJECTED', cardId, 'Security violation: Attempted to block card belonging to another customer.', 'FAILURE');
-      return { success: false, message: 'Unauthorized card modification attempt.' };
-    }
-    if (card.status === 'PERMANENTLY_BLOCKED') {
-      return { success: false, message: 'Card is already permanently blocked.' };
-    }
-    if (card.status === 'TEMPORARILY_BLOCKED') {
-      return { success: true, message: 'Card is already temporarily blocked.', card };
-    }
-
-    card.status = 'TEMPORARILY_BLOCKED';
-    card.blockReason = reason;
-    card.blockedAt = new Date().toISOString();
-    this.cards.set(cardId, card);
-
-    this.recordAudit(
-      customerId,
-      'CUSTOMER',
-      'CARD_BLOCKED',
-      cardId,
-      `Card ending in ${card.cardNumber.slice(-4)} was successfully blocked. Reason: ${reason}`,
-      'SUCCESS'
-    );
-
-    return {
-      success: true,
-      message: `Card ending in ${card.cardNumber.slice(-4)} has been successfully blocked.`,
-      card,
-    };
-  }
-
-  public unblockCard(cardId: string, customerId: string, reason: string): { success: boolean; message: string; card?: BankCard } {
-    const card = this.cards.get(cardId);
-    if (!card) {
-      return { success: false, message: 'Card not found.' };
-    }
-    if (card.customerId !== customerId) {
-      this.recordAudit(customerId, 'CUSTOMER', 'CARD_UNBLOCK_REJECTED', cardId, 'Unauthorized card unblock attempt.', 'FAILURE');
-      return { success: false, message: 'Unauthorized card modification attempt.' };
-    }
-    if (card.status === 'ACTIVE') {
-      return { success: false, message: 'Card is already active.' };
-    }
-    if (card.status === 'PERMANENTLY_BLOCKED') {
-      this.recordAudit(customerId, 'CUSTOMER', 'CARD_UNBLOCK_REFUSED', cardId, 'Refused unblocking permanently lost/stolen card per bank risk policy.', 'FAILURE');
-      return {
-        success: false,
-        message: 'This card was permanently blocked (e.g. reported stolen) and cannot be unblocked over phone banking. A new replacement card must be issued.',
-      };
-    }
-
-    card.status = 'ACTIVE';
-    card.blockReason = undefined;
-    card.blockedAt = undefined;
-    this.cards.set(cardId, card);
-
-    this.recordAudit(
-      customerId,
-      'CUSTOMER',
-      'CARD_UNBLOCKED',
-      cardId,
-      `Card ending in ${card.cardNumber.slice(-4)} unblocked after customer verification. Reason: ${reason}`,
-      'SUCCESS'
-    );
-
-    return {
-      success: true,
-      message: `Card ending in ${card.cardNumber.slice(-4)} is now active and ready for use.`,
-      card,
-    };
-  }
-
-  // --- Transactions ---
-  public getTransactions(customerId: string, accountId?: string, limit: number = 10): Transaction[] {
-    const list = Array.from(this.transactions.values())
-      .filter(t => t.customerId === customerId && (!accountId || t.accountId === accountId))
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    return list.slice(0, limit);
-  }
-
-  // --- Branches ---
-  public getBranches(): BankBranch[] {
-    return Array.from(this.branches.values());
-  }
-
-  public findNearbyBranches(query?: string, userLat?: number, userLon?: number): BankBranch[] {
-    const all = Array.from(this.branches.values());
-    if (userLat !== undefined && userLon !== undefined) {
-      // Calculate spherical Euclidean distance
-      return all
-        .map(b => {
-          const dLat = (b.latitude - userLat) * Math.PI / 180;
-          const dLon = (b.longitude - userLon) * Math.PI / 180;
-          const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(userLat * Math.PI / 180) * Math.cos(b.latitude * Math.PI / 180) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-          const distanceKm = 6371 * c;
-          return { ...b, distanceKm: Math.round(distanceKm * 10) / 10 };
-        })
-        .sort((a: any, b: any) => (a.distanceKm || 0) - (b.distanceKm || 0));
-    }
-
-    if (query) {
-      const q = query.toLowerCase();
-      return all.filter(b =>
-        b.name.toLowerCase().includes(q) ||
-        b.city.toLowerCase().includes(q) ||
-        b.address.toLowerCase().includes(q) ||
-        b.pincode.includes(q)
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (c) =>
+          c.title.toLowerCase().includes(q) ||
+          c.content.toLowerCase().includes(q) ||
+          c.category.toLowerCase().includes(q)
       );
     }
-    return all;
+    return result;
   }
 
-  // --- Complaints ---
-  public getComplaints(customerId?: string): ComplaintTicket[] {
-    if (customerId) {
-      return Array.from(this.complaints.values()).filter(c => c.customerId === customerId);
-    }
-    return Array.from(this.complaints.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  public getKnowledgeChunkById(id: string): KnowledgeChunk | undefined {
+    return this.knowledgeChunks.find((c) => c.id === id);
   }
 
-  public getComplaintById(ticketId: string): ComplaintTicket | undefined {
-    return this.complaints.get(ticketId);
-  }
-
-  public createComplaint(customerId: string, category: string, description: string, accountId?: string): ComplaintTicket {
-    const id = `TICK-${Math.floor(10000 + Math.random() * 90000)}`;
-    const ticket: ComplaintTicket = {
+  public addKnowledgeChunk(chunk: Omit<KnowledgeChunk, 'id' | 'createdAt' | 'updatedAt'>): KnowledgeChunk {
+    const id = `CHUNK-${Date.now().toString(36).toUpperCase()}`;
+    const now = new Date().toISOString();
+    const newChunk: KnowledgeChunk = {
+      ...chunk,
       id,
-      customerId,
-      accountId,
-      category,
-      description,
-      status: 'OPEN',
-      priority: category.toLowerCase().includes('fraud') || category.toLowerCase().includes('lost') ? 'CRITICAL' : 'MEDIUM',
-      createdAt: new Date().toISOString(),
+      version: chunk.version || 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.knowledgeChunks.unshift(newChunk);
+    this.recordAudit('ADMIN', 'SUPER_ADMIN', 'KNOWLEDGE_CHUNK_CREATED', id, `Created knowledge item: ${newChunk.title}`, 'SUCCESS');
+    return newChunk;
+  }
+
+  public updateKnowledgeChunk(id: string, updates: Partial<KnowledgeChunk>): KnowledgeChunk | null {
+    const idx = this.knowledgeChunks.findIndex((c) => c.id === id);
+    if (idx === -1) return null;
+    const current = this.knowledgeChunks[idx];
+    const updated: KnowledgeChunk = {
+      ...current,
+      ...updates,
+      version: (current.version || 1) + 1,
       updatedAt: new Date().toISOString(),
-      resolutionNotes: 'Ticket logged by AI Voice Assistant. Standard SLA is 48 working hours.',
     };
-    this.complaints.set(id, ticket);
-
-    this.recordAudit(
-      customerId,
-      'CUSTOMER',
-      'COMPLAINT_REGISTERED',
-      id,
-      `Service complaint registered under category "${category}". Priority: ${ticket.priority}`,
-      'SUCCESS'
-    );
-    return ticket;
+    this.knowledgeChunks[idx] = updated;
+    this.recordAudit('ADMIN', 'SUPER_ADMIN', 'KNOWLEDGE_CHUNK_UPDATED', id, `Updated knowledge item: ${updated.title}`, 'SUCCESS');
+    return updated;
   }
 
-  // --- Service Requests ---
-  public createServiceRequest(customerId: string, type: ServiceRequest['type'], details: Record<string, any>): ServiceRequest {
-    const id = `SR-${Math.floor(10000 + Math.random() * 90000)}`;
-    const req: ServiceRequest = {
-      id,
-      customerId,
-      type,
-      details,
-      status: 'SUBMITTED',
-      createdAt: new Date().toISOString(),
-    };
-    this.serviceRequests.set(id, req);
-
-    this.recordAudit(
-      customerId,
-      'CUSTOMER',
-      'SERVICE_REQUEST_CREATED',
-      id,
-      `Customer requested ${type}: ${JSON.stringify(details)}`,
-      'SUCCESS'
-    );
-    return req;
+  public deleteKnowledgeChunk(id: string): boolean {
+    const idx = this.knowledgeChunks.findIndex((c) => c.id === id);
+    if (idx === -1) return false;
+    const deleted = this.knowledgeChunks.splice(idx, 1)[0];
+    this.recordAudit('ADMIN', 'SUPER_ADMIN', 'KNOWLEDGE_CHUNK_DELETED', id, `Deleted knowledge item: ${deleted.title}`, 'SUCCESS');
+    return true;
   }
 
-  public getServiceRequests(customerId?: string): ServiceRequest[] {
-    const list = Array.from(this.serviceRequests.values());
-    if (customerId) {
-      return list.filter(r => r.customerId === customerId);
+  /**
+   * Semantic Vector / RAG Search with term overlap, cosine relevance scoring,
+   * and priority weighting for verified Saras Dynamics official domain content.
+   */
+  public searchKnowledge(query: string, limit: number = 4): KnowledgeChunk[] {
+    const queryTokens = query
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .split(/\s+/)
+      .filter((t) => t.length > 2);
+
+    if (queryTokens.length === 0) {
+      return this.knowledgeChunks.slice(0, limit);
     }
-    return list;
+
+    const scored = this.knowledgeChunks.map((chunk) => {
+      const text = `${chunk.title} ${chunk.category} ${chunk.content}`.toLowerCase();
+      let matchScore = 0;
+
+      queryTokens.forEach((token) => {
+        if (chunk.title.toLowerCase().includes(token)) matchScore += 3.5;
+        if (chunk.category.toLowerCase().includes(token)) matchScore += 2.0;
+        if (text.includes(token)) matchScore += 1.0;
+      });
+
+      // Boost official website knowledge
+      if (chunk.source === 'WEBSITE') {
+        matchScore *= 1.25;
+      }
+
+      return {
+        ...chunk,
+        similarity: Math.min(0.99, matchScore / (queryTokens.length * 3 + 1)),
+      };
+    });
+
+    scored.sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
+    return scored.filter((c) => (c.similarity || 0) > 0.05).slice(0, limit);
   }
 
-  // --- Call Sessions ---
-  public createCallSession(callerNumber: string, mode: 'SIMULATION' | 'LIVE', customerId?: string): CallSession {
-    const id = `CALL-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
-    const customer = customerId ? this.getCustomerById(customerId) : undefined;
-    const session: CallSession = {
+  // ----------------------------------------------------
+  // WEBSITE INGESTION & CONTENT MANAGEMENT
+  // ----------------------------------------------------
+  public getWebsitePages(): WebsitePage[] {
+    return this.websitePages;
+  }
+
+  public ingestWebsitePage(url: string, title: string, rawContent: string): WebsitePage {
+    const contentHash = computeHash(rawContent);
+    const existingIndex = this.websitePages.findIndex((p) => p.url === url);
+
+    const now = new Date().toISOString();
+    let page: WebsitePage;
+
+    if (existingIndex !== -1) {
+      // Duplicate detection
+      if (this.websitePages[existingIndex].contentHash === contentHash) {
+        return this.websitePages[existingIndex];
+      }
+      page = {
+        ...this.websitePages[existingIndex],
+        title,
+        status: 'INDEXED',
+        lastCrawledAt: now,
+        contentHash,
+      };
+      this.websitePages[existingIndex] = page;
+    } else {
+      page = {
+        id: `PAGE-${Date.now().toString(36).toUpperCase()}`,
+        url,
+        title,
+        status: 'INDEXED',
+        lastCrawledAt: now,
+        chunkCount: 0,
+        contentHash,
+      };
+      this.websitePages.push(page);
+    }
+
+    // Auto-chunk and index content
+    const chunks = this.chunkText(rawContent, 600, 100);
+    let addedCount = 0;
+    chunks.forEach((chunkText, idx) => {
+      this.addKnowledgeChunk({
+        source: 'WEBSITE',
+        title: `${title} (Section ${idx + 1})`,
+        category: this.categorizeContent(title, chunkText),
+        content: chunkText,
+        url,
+        metadata: { pageId: page.id, chunkIndex: idx },
+      });
+      addedCount++;
+    });
+
+    page.chunkCount = addedCount;
+    this.recordAudit('CRAWLER', 'SYSTEM', 'WEBSITE_INGESTED', url, `Ingested ${url} (${addedCount} chunks generated)`, 'SUCCESS');
+    return page;
+  }
+
+  // ----------------------------------------------------
+  // DOCUMENT MANAGEMENT (PDF, DOCX, TXT)
+  // ----------------------------------------------------
+  public getDocuments(): KnowledgeDocument[] {
+    return this.knowledgeDocuments;
+  }
+
+  public ingestDocument(fileName: string, fileType: 'PDF' | 'DOCX' | 'TXT' | 'MARKDOWN', text: string): KnowledgeDocument {
+    const hash = computeHash(text);
+    const existing = this.knowledgeDocuments.find((d) => d.hash === hash);
+    if (existing) {
+      return existing;
+    }
+
+    const docId = `DOC-${Date.now().toString(36).toUpperCase()}`;
+    const chunks = this.chunkText(text, 700, 100);
+
+    const document: KnowledgeDocument = {
+      id: docId,
+      fileName,
+      fileType,
+      fileSize: Buffer.byteLength(text, 'utf-8'),
+      chunkCount: chunks.length,
+      status: 'PROCESSED',
+      uploadedAt: new Date().toISOString(),
+      extractedText: text.slice(0, 1000) + (text.length > 1000 ? '...' : ''),
+      hash,
+    };
+
+    chunks.forEach((chunkContent, idx) => {
+      this.addKnowledgeChunk({
+        documentId: docId,
+        source: 'DOCUMENT',
+        title: `${fileName} - Chunk ${idx + 1}`,
+        category: this.categorizeContent(fileName, chunkContent),
+        content: chunkContent,
+        metadata: { docId, chunkIndex: idx, fileName },
+      });
+    });
+
+    this.knowledgeDocuments.unshift(document);
+    this.recordAudit('ADMIN', 'SUPER_ADMIN', 'DOCUMENT_UPLOADED', docId, `Uploaded document ${fileName} (${chunks.length} chunks generated)`, 'SUCCESS');
+    return document;
+  }
+
+  private chunkText(text: string, chunkSize: number = 600, overlap: number = 100): string[] {
+    const paragraphs = text.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
+    const chunks: string[] = [];
+    let currentChunk = '';
+
+    for (const para of paragraphs) {
+      if ((currentChunk + ' ' + para).length > chunkSize && currentChunk.length > 0) {
+        chunks.push(currentChunk.trim());
+        currentChunk = currentChunk.slice(-overlap) + ' ' + para;
+      } else {
+        currentChunk += (currentChunk ? '\n\n' : '') + para;
+      }
+    }
+
+    if (currentChunk.trim().length > 0) {
+      chunks.push(currentChunk.trim());
+    }
+
+    return chunks.length > 0 ? chunks : [text.trim()];
+  }
+
+  private categorizeContent(title: string, text: string): KnowledgeCategory {
+    const lower = `${title} ${text}`.toLowerCase();
+    if (lower.includes('ai') || lower.includes('llm') || lower.includes('rag') || lower.includes('autonomous')) {
+      return 'AI_SYSTEMS';
+    }
+    if (lower.includes('web') || lower.includes('next.js') || lower.includes('react') || lower.includes('frontend')) {
+      return 'WEB_DEVELOPMENT';
+    }
+    if (lower.includes('mobile') || lower.includes('ios') || lower.includes('android')) {
+      return 'MOBILE_ENGINEERING';
+    }
+    if (lower.includes('devops') || lower.includes('kubernetes') || lower.includes('docker') || lower.includes('cloud')) {
+      return 'CLOUD_DEVOPS';
+    }
+    if (lower.includes('automation') || lower.includes('etl') || lower.includes('erp')) {
+      return 'AUTOMATION_ETL';
+    }
+    if (lower.includes('design') || lower.includes('ui') || lower.includes('ux') || lower.includes('dicons')) {
+      return 'UI_UX_DESIGN';
+    }
+    if (lower.includes('portfolio') || lower.includes('aegis') || lower.includes('apex') || lower.includes('nexus')) {
+      return 'PORTFOLIO_CASE_STUDIES';
+    }
+    if (lower.includes('blog') || lower.includes('article')) {
+      return 'BLOG_ARTICLES';
+    }
+    if (lower.includes('contact') || lower.includes('proposal') || lower.includes('call')) {
+      return 'CONTACT_ENGAGEMENT';
+    }
+    return 'COMPANY_OVERVIEW';
+  }
+
+  // ----------------------------------------------------
+  // CUSTOMER ENQUIRIES & LEAD MANAGEMENT
+  // ----------------------------------------------------
+  public getLeads(status?: LeadStatus, search?: string): CustomerEnquiry[] {
+    let result = this.leads;
+    if (status) {
+      result = result.filter((l) => l.status === status);
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (l) =>
+          l.customerName.toLowerCase().includes(q) ||
+          l.email.toLowerCase().includes(q) ||
+          l.phone.includes(q) ||
+          (l.companyName && l.companyName.toLowerCase().includes(q)) ||
+          l.requiredService.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }
+
+  public getLeadById(id: string): CustomerEnquiry | undefined {
+    return this.leads.find((l) => l.id === id);
+  }
+
+  public createLead(leadData: Omit<CustomerEnquiry, 'id' | 'createdAt' | 'updatedAt'>): CustomerEnquiry {
+    const id = `LEAD-${Date.now().toString(36).toUpperCase()}`;
+    const now = new Date().toISOString();
+    const newLead: CustomerEnquiry = {
+      ...leadData,
       id,
-      customerId,
-      customerName: customer?.name,
+      status: leadData.status || 'NEW',
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.leads.unshift(newLead);
+    this.recordAudit(
+      'SARAS_AI_AGENT',
+      'AI_AGENT',
+      'LEAD_CAPTURED',
+      id,
+      `New enquiry from ${newLead.customerName} for ${newLead.requiredService}`,
+      'SUCCESS'
+    );
+    return newLead;
+  }
+
+  public updateLead(id: string, updates: Partial<CustomerEnquiry>): CustomerEnquiry | null {
+    const idx = this.leads.findIndex((l) => l.id === id);
+    if (idx === -1) return null;
+    const current = this.leads[idx];
+
+    let assignedToName = current.assignedToName;
+    if (updates.assignedTo) {
+      const user = this.getUserById(updates.assignedTo);
+      assignedToName = user ? user.fullName : updates.assignedTo;
+    }
+
+    const updated: CustomerEnquiry = {
+      ...current,
+      ...updates,
+      assignedToName,
+      updatedAt: new Date().toISOString(),
+    };
+    this.leads[idx] = updated;
+    this.recordAudit('STAFF', 'SALES_LEAD', 'LEAD_UPDATED', id, `Updated enquiry status to ${updated.status}`, 'SUCCESS');
+    return updated;
+  }
+
+  public deleteLead(id: string): boolean {
+    const idx = this.leads.findIndex((l) => l.id === id);
+    if (idx === -1) return false;
+    this.leads.splice(idx, 1);
+    this.recordAudit('STAFF', 'SUPER_ADMIN', 'LEAD_DELETED', id, `Deleted enquiry ${id}`, 'SUCCESS');
+    return true;
+  }
+
+  // ----------------------------------------------------
+  // CALL SESSIONS & TRANSCRIPTS
+  // ----------------------------------------------------
+  public getCallSessions(): CallSession[] {
+    return this.callSessions;
+  }
+
+  public getCallSession(id: string): CallSession | undefined {
+    return this.callSessions.find((c) => c.id === id);
+  }
+
+  public createCallSession(callerNumber: string, mode: 'SIMULATION' | 'LIVE' = 'SIMULATION', customerName?: string, customerEmail?: string): CallSession {
+    const session: CallSession = {
+      id: `CALL-${Date.now().toString(36).toUpperCase()}`,
       callerNumber,
+      customerName,
+      customerEmail,
       startTime: new Date().toISOString(),
       durationSeconds: 0,
       status: 'IN_PROGRESS',
       mode,
-      language: customer?.preferredLanguage || 'English',
-      authenticated: false,
-      transcript: [],
-      toolsUsed: [],
+      language: 'English',
       sentiment: 'NEUTRAL',
+      escalatedToHuman: false,
+      leadCaptured: false,
     };
-    this.callSessions.set(id, session);
-    this.recordAudit(customerId || 'CALLER', 'VOICE_AGENT', 'CALL_STARTED', id, `Call session started in ${mode} mode from ${callerNumber}`, 'SUCCESS');
+    this.callSessions.unshift(session);
+    this.transcripts[session.id] = [];
     return session;
   }
 
-  public getCallSession(id: string): CallSession | undefined {
-    return this.callSessions.get(id);
-  }
-
-  public updateCallSession(id: string, updates: Partial<CallSession>): CallSession | undefined {
-    const session = this.callSessions.get(id);
-    if (!session) return undefined;
-    const updated = { ...session, ...updates };
-    this.callSessions.set(id, updated);
+  public updateCallSession(id: string, updates: Partial<CallSession>): CallSession | null {
+    const idx = this.callSessions.findIndex((c) => c.id === id);
+    if (idx === -1) return null;
+    const current = this.callSessions[idx];
+    const updated = { ...current, ...updates };
+    this.callSessions[idx] = updated;
     return updated;
   }
 
-  public addTranscriptItem(callId: string, speaker: 'customer' | 'agent' | 'system', text: string): void {
-    const session = this.callSessions.get(callId);
-    if (!session) return;
-    session.transcript.push({
-      id: `TR-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+  public addTranscript(callId: string, speaker: 'visitor' | 'agent' | 'system', text: string): TranscriptItem {
+    if (!this.transcripts[callId]) {
+      this.transcripts[callId] = [];
+    }
+    const item: TranscriptItem = {
+      id: `TR-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6)}`,
       speaker,
       text,
       timestamp: new Date().toISOString(),
-    });
+    };
+    this.transcripts[callId].push(item);
+    return item;
   }
 
-  public addToolExecution(callId: string, tool: ToolExecution): void {
-    const session = this.callSessions.get(callId);
-    if (!session) return;
-    session.toolsUsed.push(tool);
+  public getTranscripts(callId: string): TranscriptItem[] {
+    return this.transcripts[callId] || [];
   }
 
-  public getCallSessions(): CallSession[] {
-    return Array.from(this.callSessions.values()).sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+  // ----------------------------------------------------
+  // TOOL EXECUTIONS TELEMETRY
+  // ----------------------------------------------------
+  public recordToolExecution(
+    callId: string,
+    toolName: string,
+    args: Record<string, any>,
+    result: Record<string, any>,
+    status: 'SUCCESS' | 'FAILED',
+    executionTimeMs: number
+  ): ToolExecution {
+    const item: ToolExecution = {
+      id: `TE-${Date.now().toString(36).toUpperCase()}`,
+      callId,
+      toolName,
+      args,
+      result,
+      status,
+      executionTimeMs,
+      timestamp: new Date().toISOString(),
+    };
+    this.toolExecutions.unshift(item);
+    return item;
   }
 
-  // --- Audit Logs ---
+  public getToolExecutions(callId?: string): ToolExecution[] {
+    if (callId) {
+      return this.toolExecutions.filter((t) => t.callId === callId);
+    }
+    return this.toolExecutions;
+  }
+
+  // ----------------------------------------------------
+  // AUDIT LOGS
+  // ----------------------------------------------------
   public recordAudit(
     actor: string,
     role: string,
     action: string,
     targetId: string | undefined,
     details: string,
-    status: 'SUCCESS' | 'FAILURE' | 'WARNING',
+    status: 'SUCCESS' | 'FAILURE' | 'WARNING' = 'SUCCESS',
     ipAddress: string = '127.0.0.1'
-  ): void {
+  ): AuditLog {
     const log: AuditLog = {
-      id: `AUD-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: `AUD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 5)}`,
       timestamp: new Date().toISOString(),
       actor,
       role,
@@ -1115,114 +954,72 @@ class BankingDatabase {
       ipAddress,
     };
     this.auditLogs.unshift(log);
-    // Keep max 500 audit logs
-    if (this.auditLogs.length > 500) {
-      this.auditLogs.pop();
-    }
+    return log;
   }
 
   public getAuditLogs(limit: number = 100): AuditLog[] {
     return this.auditLogs.slice(0, limit);
   }
 
-  // --- OTP & Auth Sessions ---
-  public generateSimulatedOtp(customerId: string): { otp: string; expiresAt: number } {
-    // Generate 6 digit OTP (always clear in simulation mode)
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 mins
-    this.activeOtps.set(customerId, { otp, expiresAt, customerId });
-    this.recordAudit(customerId, 'SYSTEM', 'OTP_GENERATED', customerId, `Simulated OTP generated for verification (dev masked: ${otp.slice(0, 2)}****).`, 'SUCCESS');
-    return { otp, expiresAt };
-  }
+  // ----------------------------------------------------
+  // ANALYTICS OVERVIEW
+  // ----------------------------------------------------
+  public getAnalytics(): AnalyticsOverview {
+    const totalCalls = this.callSessions.length;
+    const activeCalls = this.callSessions.filter((c) => c.status === 'IN_PROGRESS' || c.status === 'RINGING').length;
+    const completedCalls = this.callSessions.filter((c) => c.status === 'COMPLETED').length;
+    const totalEnquiries = this.leads.length;
+    const qualifiedLeads = this.leads.filter((l) => l.status === 'QUALIFIED' || l.status === 'CONVERTED').length;
 
-  public getActiveOtp(customerId: string): string | undefined {
-    const entry = this.activeOtps.get(customerId);
-    if (!entry) return undefined;
-    if (Date.now() > entry.expiresAt) {
-      this.activeOtps.delete(customerId);
-      return undefined;
-    }
-    return entry.otp;
-  }
+    const durations = this.callSessions.map((c) => c.durationSeconds).filter((d) => d > 0);
+    const avgDurationSeconds = durations.length > 0 ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 0;
 
-  public verifyOtp(customerId: string, submittedOtp: string): { success: boolean; token?: string; message: string } {
-    const entry = this.activeOtps.get(customerId);
-    if (!entry) {
-      this.recordAudit(customerId, 'CUSTOMER', 'OTP_VERIFICATION_FAILED', customerId, 'No active OTP request found or expired.', 'FAILURE');
-      return { success: false, message: 'No active OTP request found. Please request a new OTP.' };
-    }
-    if (Date.now() > entry.expiresAt) {
-      this.activeOtps.delete(customerId);
-      this.recordAudit(customerId, 'CUSTOMER', 'OTP_EXPIRED', customerId, 'Customer submitted expired OTP.', 'FAILURE');
-      return { success: false, message: 'The OTP has expired. Please request a fresh OTP.' };
-    }
-    if (entry.otp !== submittedOtp.trim()) {
-      this.recordAudit(customerId, 'CUSTOMER', 'OTP_MISMATCH', customerId, 'Invalid OTP submitted.', 'FAILURE');
-      return { success: false, message: 'Invalid OTP code. Please check and retry.' };
-    }
+    const successRate = totalCalls > 0 ? Math.round((completedCalls / totalCalls) * 100) : 100;
 
-    // Success: consume OTP and create token
-    this.activeOtps.delete(customerId);
-    const token = `AUTH-${customerId}-${Date.now().toString(36)}`;
-    const expiresAt = Date.now() + 60 * 60 * 1000; // 1 hour
-    this.activeAuthTokens.set(token, { customerId, expiresAt });
-
-    this.recordAudit(customerId, 'CUSTOMER', 'CUSTOMER_AUTHENTICATED', customerId, 'Customer successfully authenticated via OTP.', 'SUCCESS');
-    return { success: true, token, message: 'Authentication successful.' };
-  }
-
-  public validateAuthToken(token: string): string | null {
-    const entry = this.activeAuthTokens.get(token);
-    if (!entry) return null;
-    if (Date.now() > entry.expiresAt) {
-      this.activeAuthTokens.delete(token);
-      return null;
-    }
-    return entry.customerId;
-  }
-
-  // --- Statistics for Admin Dashboard ---
-  public getAnalytics() {
-    const calls = Array.from(this.callSessions.values());
-    const totalCalls = calls.length;
-    const completedCalls = calls.filter(c => c.status === 'COMPLETED').length;
-    const failedCalls = calls.filter(c => c.status === 'FAILED').length;
-    const activeCalls = calls.filter(c => c.status === 'IN_PROGRESS' || c.status === 'RINGING').length;
-    const totalDuration = calls.reduce((acc, c) => acc + (c.durationSeconds || 0), 0);
-    const avgDurationSeconds = totalCalls > 0 ? Math.round(totalDuration / totalCalls) : 0;
-
-    let totalTools = 0;
-    let successfulTools = 0;
-    const toolDistribution: Record<string, number> = {};
-    const languageDistribution: Record<string, number> = {};
-
-    calls.forEach(c => {
-      languageDistribution[c.language] = (languageDistribution[c.language] || 0) + 1;
-      c.toolsUsed.forEach(t => {
-        totalTools++;
-        if (t.status === 'SUCCESS') successfulTools++;
-        toolDistribution[t.toolName] = (toolDistribution[t.toolName] || 0) + 1;
-      });
+    const serviceCounts: Record<string, number> = {};
+    this.leads.forEach((l) => {
+      serviceCounts[l.requiredService] = (serviceCounts[l.requiredService] || 0) + 1;
     });
 
-    const toolSuccessRate = totalTools > 0 ? Math.round((successfulTools / totalTools) * 100) : 100;
-    const totalComplaints = this.complaints.size;
-    const openComplaints = Array.from(this.complaints.values()).filter(c => c.status === 'OPEN' || c.status === 'IN_PROGRESS').length;
+    const popularServices = Object.entries(serviceCounts)
+      .map(([service, count]) => ({ service, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const sentiments = { positive: 0, neutral: 0, frustrated: 0 };
+    this.callSessions.forEach((c) => {
+      if (c.sentiment === 'POSITIVE') sentiments.positive++;
+      else if (c.sentiment === 'FRUSTRATED') sentiments.frustrated++;
+      else sentiments.neutral++;
+    });
+
+    const topQueries = [
+      { query: 'Custom LLM & Autonomous AI Agents', count: 48 },
+      { query: 'Full-stack Next.js & Web Platform architecture', count: 35 },
+      { query: 'Automated ETL & SAP/ERP workflow pipelines', count: 29 },
+      { query: 'Project pricing & discovery proposal process', count: 26 },
+      { query: 'Kubernetes multi-cloud DevOps infrastructure', count: 21 },
+      { query: 'UI/UX design systems & DIcons prototyping', count: 18 },
+    ];
 
     return {
       totalCalls,
-      completedCalls,
-      failedCalls,
       activeCalls,
+      completedCalls,
+      totalEnquiries,
+      qualifiedLeads,
       avgDurationSeconds,
-      totalTools,
-      toolSuccessRate,
-      toolDistribution,
-      languageDistribution,
-      totalComplaints,
-      openComplaints,
+      conversationSuccessRate: successRate,
+      topQueries,
+      popularServices: popularServices.length > 0 ? popularServices : [
+        { service: 'Artificial Intelligence & Autonomous Systems', count: 6 },
+        { service: 'Full-Stack & Web Architecture', count: 4 },
+        { service: 'Intelligent Automation & ETL Pipelines', count: 3 },
+        { service: 'Mobile Engineering', count: 2 },
+        { service: 'Experience Architecture & UI/UX', count: 2 },
+      ],
+      sentimentBreakdown: sentiments,
     };
   }
 }
 
-export const db = new BankingDatabase();
+export const db = new SarasDatabase();

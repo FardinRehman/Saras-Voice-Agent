@@ -1,255 +1,349 @@
-import React, { useState, useEffect } from 'react';
-import { Customer, BankAccount, BankCard, Transaction, ComplaintTicket } from '../types/banking.ts';
-import { formatCurrencyINR, formatDateTime } from '../utils/formatters.ts';
+import React, { useState } from 'react';
+import { CustomerEnquiry } from '../types/saras.ts';
 import {
-  CreditCard,
-  Wallet,
-  ArrowUpRight,
-  ArrowDownLeft,
-  ShieldAlert,
-  ShieldCheck,
-  CheckCircle2,
-  Clock,
-  FileText,
-  AlertTriangle,
+  Sparkles,
+  Cpu,
+  Layers,
+  Smartphone,
+  Cloud,
   RefreshCw,
-  Building,
+  Palette,
+  ExternalLink,
+  CheckCircle2,
+  Calendar,
+  Send,
+  Zap,
+  Check,
+  Briefcase,
+  Code2,
+  Globe,
+  Server,
+  ArrowRight,
+  ShieldCheck,
+  MessageSquare,
+  ChevronRight,
+  X,
 } from 'lucide-react';
 
-interface CustomerDashboardProps {
-  currentCustomer: Customer | null;
-  onOpenCustomerPicker: () => void;
+interface ServiceDetailModalState {
+  isOpen: boolean;
+  service: typeof SERVICES[0] | null;
 }
 
-export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
-  currentCustomer,
-  onOpenCustomerPicker,
-}) => {
-  const [accounts, setAccounts] = useState<BankAccount[]>([]);
-  const [cards, setCards] = useState<BankCard[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [complaints, setComplaints] = useState<ComplaintTicket[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
+const SERVICES = [
+  {
+    id: 'ai_systems',
+    title: 'AI & Autonomous Systems',
+    category: 'Enterprise Intelligence',
+    icon: Cpu,
+    tagline: 'Custom LLM integrations, RAG pipelines, and autonomous workflow agents',
+    description:
+      'Architecting and deploying proprietary large language models, enterprise vector retrieval pipelines (pgvector/Pinecone), and autonomous multi-agent decision systems with enterprise guardrails.',
+    features: [
+      'Domain-specific LLM fine-tuning & prompt alignment',
+      'Hybrid semantic RAG with hallucination protection',
+      'Autonomous multi-step agents with API and tool execution',
+      'Predictive neural modeling and anomaly detection',
+    ],
+    deliverables: ['Custom Model Weights', 'Vector Index Infrastructure', 'Evaluation Benchmarks', 'Production APIs'],
+    tech: ['PyTorch', 'LangChain', 'LlamaIndex', 'OpenAI', 'pgvector', 'vLLM'],
+  },
+  {
+    id: 'custom_software',
+    title: 'Custom Software Development',
+    category: 'Core Engineering',
+    icon: Code2,
+    tagline: 'Tailored enterprise software platforms, secure APIs, and modular microservices',
+    description:
+      'End-to-end bespoke software engineering solving mission-critical business challenges with high concurrency, distributed state management, and enterprise-grade reliability.',
+    features: [
+      'High-throughput distributed systems & microservices',
+      'Enterprise database architecture & query optimization',
+      'Event-driven architectures with Kafka & RabbitMQ',
+      'Comprehensive unit, integration, and security testing',
+    ],
+    deliverables: ['Full Source Code & Repository', 'CI/CD Pipeline', 'Architecture Documentation', 'API Contracts'],
+    tech: ['Node.js', 'Go', 'Python', 'PostgreSQL', 'Redis', 'Docker'],
+  },
+  {
+    id: 'web_development',
+    title: 'Web Application Development',
+    category: 'Digital Platforms',
+    icon: Globe,
+    tagline: 'High-performance React and Next.js web applications with server components',
+    description:
+      'Modern, accessible, and blindingly fast web platforms built on Next.js App Router, featuring sub-second time-to-interactive, micro-frontends, and seamless WebSocket streaming.',
+    features: [
+      'Next.js App Router and React Server Components',
+      'Distributed micro-frontends and federated state',
+      'Sub-second real-time streaming over WebSockets',
+      'High-concurrency GraphQL and RESTful gateways',
+    ],
+    deliverables: ['Production Web Build', 'Design System Integration', 'SEO & Core Web Vitals Audit', 'Admin CMS'],
+    tech: ['Next.js', 'React', 'TypeScript', 'Tailwind CSS', 'GraphQL', 'PostgreSQL'],
+  },
+  {
+    id: 'mobile_development',
+    title: 'Mobile Application Development',
+    category: 'Mobile Engineering',
+    icon: Smartphone,
+    tagline: 'Native and cross-platform mobile apps with offline-first synchronization',
+    description:
+      'Native iOS (Swift/SwiftUI) and Android (Kotlin/Compose) alongside React Native and Flutter applications engineered for flawless performance, biometric security, and offline resilience.',
+    features: [
+      'iOS (Swift/SwiftUI) and Android (Kotlin/Jetpack Compose)',
+      'Cross-platform React Native and Flutter with native modules',
+      'Offline-first synchronization with local SQLite/CRDT',
+      'BLE hardware connectivity and biometric telemetry',
+    ],
+    deliverables: ['App Store & Play Store Submissions', 'Native SDK Bindings', 'Offline Sync Engine', 'Push Services'],
+    tech: ['Swift', 'Kotlin', 'React Native', 'Flutter', 'WatermelonDB', 'Firebase'],
+  },
+  {
+    id: 'intelligent_automation',
+    title: 'Intelligent Automation',
+    category: 'Process Engineering',
+    icon: RefreshCw,
+    tagline: 'Automated business workflows, high-throughput ETL pipelines, and ERP integrations',
+    description:
+      'Transform manual, error-prone corporate processes into autonomous workflows. Automate data extraction, reconciliation, CRM data routing, and ERP orchestrations.',
+    features: [
+      'Robotic process tasks and automated business pipelines',
+      'High-throughput ETL data ingestion and transformation',
+      'Direct enterprise ERP (SAP/Oracle) and CRM integration',
+      'Real-time webhook and event-driven architecture',
+    ],
+    deliverables: ['Automated Workflow Dag', 'ETL Data Connectors', 'Error Recovery Rules', 'Audit Logs'],
+    tech: ['Apache Kafka', 'Airflow', 'Python', 'Node.js', 'Celery', 'PostgreSQL'],
+  },
+  {
+    id: 'ai_integration',
+    title: 'AI Integration',
+    category: 'System Modernization',
+    icon: Zap,
+    tagline: 'Embedding multimodal AI models into existing corporate infrastructure',
+    description:
+      'Infuse your existing web applications, mobile apps, and internal databases with state-of-the-art vision, speech-to-speech, and semantic search models without rebuilding from scratch.',
+    features: [
+      'Speech-to-speech voice agent integration (OpenAI Realtime)',
+      'Document parsing & multimodal vision intelligence',
+      'Enterprise SSO & security boundary compliance',
+      'Model performance monitoring & latency optimization',
+    ],
+    deliverables: ['Integration SDK / Middleware', 'Model Proxy & Cache', 'Security Audit', 'Telemetry Dashboard'],
+    tech: ['OpenAI Realtime', 'Whisper', 'Embeddings API', 'Redis Cache', 'TypeScript'],
+  },
+  {
+    id: 'digital_engineering',
+    title: 'Digital Engineering',
+    category: 'Cloud & Infrastructure',
+    icon: Server,
+    tagline: 'Resilient Kubernetes clusters, multi-cloud setups, and DevOps automation',
+    description:
+      'Hardened cloud infrastructure and automated deployment pipelines ensuring zero-downtime releases, automated scaling, multi-region failover, and comprehensive system telemetry.',
+    features: [
+      'Production Kubernetes (EKS/GKE/AKS) with autoscaling',
+      'Infrastructure as Code (Terraform / OpenTofu)',
+      'Automated zero-downtime canary release pipelines',
+      'Full-stack Prometheus and Grafana observability',
+    ],
+    deliverables: ['Terraform Modules', 'Helm Charts', 'CI/CD Pipelines', 'Monitoring Runbooks'],
+    tech: ['Kubernetes', 'Docker', 'AWS', 'GCP', 'Terraform', 'GitHub Actions'],
+  },
+];
 
-  const fetchData = async () => {
-    if (!currentCustomer) return;
-    setLoading(true);
+const PORTFOLIO_PROJECTS = [
+  {
+    title: 'Aegis Neural Engine',
+    category: 'AI Architecture & Autonomous Decision Platform',
+    metrics: 'Sub-50ms inference latency • 99.98% production uptime • 1.2M daily inferences',
+    description:
+      'Flagship AI deployment by Saras Dynamics. Processes unstructured multi-modal enterprise data in real time with custom RAG guardrails.',
+  },
+  {
+    title: 'Apex FinTech Terminal',
+    category: 'High-Performance Financial Web Platform',
+    metrics: 'Sub-100ms render cycle • Real-time order books • 60FPS visualizations',
+    description:
+      'Institutional-grade wealth management terminal built with Next.js micro-frontends, real-time WebSockets, and strict security protocols.',
+  },
+  {
+    title: 'Nexus Health Wearable',
+    category: 'Mobile Engineering & Biometric Telemetry',
+    metrics: 'BLE biometric telemetry • Offline-first SQLite • 99.4% packet delivery rate',
+    description:
+      'Digital health mobile ecosystem connecting Bluetooth Low Energy health sensors with seamless offline caching and background synchronization.',
+  },
+];
+
+export const CustomerDashboard: React.FC = () => {
+  const [selectedService, setSelectedService] = useState<string>('ai_systems');
+  const [modalState, setModalState] = useState<ServiceDetailModalState>({
+    isOpen: false,
+    service: null,
+  });
+  const [leadForm, setLeadForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    company: '',
+    description: '',
+    budget: '$25,000 - $50,000',
+    timeline: '2 to 3 months',
+  });
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [submittedLead, setSubmittedLead] = useState<CustomerEnquiry | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
     try {
-      const res = await fetch(`/api/customers/${currentCustomer.id}`);
-      const data = await res.json();
-      setAccounts(data.accounts || []);
-      setCards(data.cards || []);
-      setTransactions(data.transactions || []);
-      setComplaints(data.complaints || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, [currentCustomer]);
-
-  const handleCardToggle = async (card: BankCard) => {
-    if (!currentCustomer) return;
-    const isBlocked = card.status === 'TEMPORARILY_BLOCKED';
-    const endpoint = isBlocked ? `/api/cards/${card.id}/unblock` : `/api/cards/${card.id}/block`;
-    try {
-      const res = await fetch(endpoint, {
+      const activeServiceObj = SERVICES.find((s) => s.id === selectedService);
+      const res = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customerId: currentCustomer.id,
-          reason: isBlocked ? 'Customer unblocked via dashboard' : 'Customer locked via dashboard',
+          customerName: leadForm.name,
+          email: leadForm.email,
+          phone: leadForm.phone,
+          companyName: leadForm.company,
+          requiredService: activeServiceObj ? activeServiceObj.title : 'AI & Autonomous Systems',
+          projectDescription: leadForm.description,
+          estimatedBudget: leadForm.budget,
+          expectedTimeline: leadForm.timeline,
         }),
       });
       const data = await res.json();
       if (res.ok) {
-        setActionMessage(data.message);
-        fetchData();
+        setSubmittedLead(data);
+        setLeadForm({
+          name: '',
+          email: '',
+          phone: '',
+          company: '',
+          description: '',
+          budget: '$25,000 - $50,000',
+          timeline: '2 to 3 months',
+        });
       } else {
-        alert(data.message || 'Action failed');
+        alert(data.error || 'Failed to submit enquiry');
       }
     } catch (err: any) {
       alert(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  if (!currentCustomer) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 py-12 text-center">
-        <p className="text-slate-500">Please select a customer first.</p>
-        <button
-          onClick={onOpenCustomerPicker}
-          className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold"
-        >
-          Select Customer
-        </button>
-      </div>
-    );
-  }
+  const handleDiscussService = (serviceId: string) => {
+    setSelectedService(serviceId);
+    const element = document.getElementById('consultation-form');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
-  const totalBalance = accounts.reduce((acc, a) => acc + a.balance, 0);
+  const handleLearnMore = (service: typeof SERVICES[0]) => {
+    setModalState({ isOpen: true, service });
+  };
+
+  const activeServiceData = SERVICES.find((s) => s.id === selectedService) || SERVICES[0];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-      {/* Customer Header Summary */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md">
-              {currentCustomer.id}
-            </span>
-            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5" /> Full KYC Verified
-            </span>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-10">
+      {/* Hero Banner */}
+      <div className="relative rounded-2xl bg-[#171717] text-white p-8 sm:p-10 border border-[#262626] shadow-sm overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#E50918]/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+
+        <div className="relative z-10 max-w-3xl space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white text-xs font-bold tracking-wide">
+            <span className="w-2 h-2 rounded-full bg-[#E50918] animate-pulse" />
+            <span>SARAS DYNAMICS SOLUTIONS</span>
           </div>
-          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">
-            {currentCustomer.name}
+
+          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
+            Solutions & Engineering Portfolio
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Registered Mobile: <strong>{currentCustomer.phone}</strong> • PAN: <strong>{currentCustomer.panNumber}</strong> • Language: <strong>{currentCustomer.preferredLanguage}</strong>
+
+          <p className="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-2xl">
+            Explore our verified software engineering disciplines, production AI deployments, and architectural capabilities. Our solutions team delivers enterprise-grade digital systems globally from Coimbatore, Tamil Nadu, India.
           </p>
         </div>
+      </div>
 
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <span className="text-xs text-slate-400 block">Total Combined Liquid Assets</span>
-            <span className="text-2xl font-black text-slate-900 dark:text-white">
-              {formatCurrencyINR(totalBalance)}
-            </span>
+      {/* Services Grid (Requirement 9) */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+              Enterprise Services
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Select a service to inspect architectural deliverables and schedule a discovery consultation.
+            </p>
           </div>
-          <button
-            onClick={fetchData}
-            className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"
-            title="Refresh Banking Data"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
         </div>
-      </div>
 
-      {actionMessage && (
-        <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700/60 rounded-xl p-3 flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-200">
-          <span>{actionMessage}</span>
-          <button onClick={() => setActionMessage(null)} className="font-bold ml-2">×</button>
-        </div>
-      )}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {SERVICES.map((s) => {
+            const IconComp = s.icon;
+            const isSelected = selectedService === s.id;
 
-      {/* Linked Bank Accounts */}
-      <div>
-        <h2 className="text-base font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-          <Wallet className="w-4 h-4 text-blue-600" />
-          Linked Bank Accounts ({accounts.length})
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {accounts.map((acc) => (
-            <div
-              key={acc.id}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="text-xs font-bold tracking-wider px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                    {acc.accountType} ACCOUNT
-                  </span>
-                  <div className="mt-2 text-sm font-mono text-slate-600 dark:text-slate-300">
-                    {acc.maskedAccountNumber}
-                  </div>
-                </div>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
-                  {acc.status}
-                </span>
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-end justify-between">
-                <div>
-                  <span className="text-[11px] text-slate-400 block">Available Balance</span>
-                  <span className="text-xl font-extrabold text-slate-900 dark:text-white">
-                    {formatCurrencyINR(acc.balance)}
-                  </span>
-                </div>
-                <div className="text-right text-[11px] text-slate-400 font-mono">
-                  IFSC: {acc.ifscCode}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Linked Cards */}
-      <div>
-        <h2 className="text-base font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-          <CreditCard className="w-4 h-4 text-teal-600" />
-          Linked Debit & Credit Cards ({cards.length})
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {cards.map((c) => {
-            const isBlocked = c.status === 'TEMPORARILY_BLOCKED';
-            const isPermBlocked = c.status === 'PERMANENTLY_BLOCKED';
             return (
               <div
-                key={c.id}
-                className={`rounded-2xl p-5 border transition-all ${
-                  isPermBlocked
-                    ? 'bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-900'
-                    : isBlocked
-                    ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800'
-                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                key={s.id}
+                className={`bg-white dark:bg-[#171717] rounded-2xl p-6 border transition-all duration-200 flex flex-col justify-between space-y-4 hover:shadow-md ${
+                  isSelected
+                    ? 'border-[#E50918] ring-1 ring-[#E50918]/30 shadow-xs'
+                    : 'border-[#E5E5E7] dark:border-[#262626] hover:border-slate-300 dark:hover:border-slate-700'
                 }`}
               >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="font-mono text-xs text-slate-400 font-semibold">{c.cardNetwork} {c.cardType}</span>
-                    <div className="text-base font-mono font-bold tracking-widest text-slate-900 dark:text-white mt-1">
-                      {c.maskedCardNumber}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/40 text-[#E50918]">
+                      <IconComp className="w-5 h-5" />
                     </div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      {s.category}
+                    </span>
                   </div>
-                  <span
-                    className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                      c.status === 'ACTIVE'
-                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                        : isBlocked
-                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
-                        : 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300'
-                    }`}
+
+                  <div>
+                    <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                      {s.title}
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                      {s.tagline}
+                    </p>
+                  </div>
+
+                  {/* Capabilities Bullet points */}
+                  <div className="space-y-1.5 pt-2">
+                    {s.features.slice(0, 2).map((feat, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-[#E50918] shrink-0 mt-0.5" />
+                        <span className="line-clamp-1">{feat}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Actions: Learn More & Discuss This Service */}
+                <div className="pt-4 border-t border-[#E5E5E7] dark:border-[#262626] flex items-center justify-between gap-2">
+                  <button
+                    onClick={() => handleLearnMore(s)}
+                    className="text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-[#E50918] transition-colors flex items-center gap-1 cursor-pointer"
                   >
-                    {c.status}
-                  </span>
-                </div>
+                    <span>Learn More</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
 
-                <div className="mt-3 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                  <span>Expires: {c.expiryMonth}/{c.expiryYear}</span>
-                  <span>Daily ATM Limit: {formatCurrencyINR(c.dailyAtmLimit)}</span>
-                </div>
-
-                {c.blockReason && (
-                  <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300 italic">
-                    Reason: {c.blockReason}
-                  </p>
-                )}
-
-                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400">Card ID: {c.id}</span>
-                  {!isPermBlocked && (
-                    <button
-                      onClick={() => handleCardToggle(c)}
-                      className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
-                        isBlocked
-                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                          : 'bg-red-600 hover:bg-red-500 text-white'
-                      }`}
-                    >
-                      {isBlocked ? 'Unblock Card' : 'Block Card'}
-                    </button>
-                  )}
-                  {isPermBlocked && (
-                    <span className="text-xs text-red-600 font-medium">Permanently Blocked (Visit Branch)</span>
-                  )}
+                  <button
+                    onClick={() => handleDiscussService(s.id)}
+                    className="px-3 py-1.5 rounded-lg bg-[#E50918] hover:bg-[#C90012] text-white text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                  >
+                    Discuss This Service
+                  </button>
                 </div>
               </div>
             );
@@ -257,123 +351,303 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
         </div>
       </div>
 
-      {/* Recent Transactions Table */}
-      <div>
-        <h2 className="text-base font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-          <Clock className="w-4 h-4 text-purple-600" />
-          Recent Transactions
-        </h2>
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Date & Time</th>
-                  <th className="px-4 py-3 font-semibold">Description</th>
-                  <th className="px-4 py-3 font-semibold">Category</th>
-                  <th className="px-4 py-3 font-semibold">Type</th>
-                  <th className="px-4 py-3 font-semibold">Amount</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 font-semibold">Reference</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {transactions.map((t) => {
-                  const isCredit = t.type === 'CREDIT';
-                  return (
-                    <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-mono whitespace-nowrap">
-                        {formatDateTime(t.date)}
-                      </td>
-                      <td className="px-4 py-3 font-medium text-slate-900 dark:text-white max-w-xs truncate">
-                        {t.description}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                        {t.category}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1 font-semibold ${
-                            isCredit ? 'text-emerald-600' : 'text-red-600'
-                          }`}
-                        >
-                          {isCredit ? <ArrowDownLeft className="w-3.5 h-3.5" /> : <ArrowUpRight className="w-3.5 h-3.5" />}
-                          {t.type}
-                        </span>
-                      </td>
-                      <td className={`px-4 py-3 font-bold whitespace-nowrap ${isCredit ? 'text-emerald-600' : 'text-slate-900 dark:text-white'}`}>
-                        {isCredit ? '+' : '-'}{formatCurrencyINR(t.amount)}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            t.status === 'SUCCESS'
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                              : 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300'
-                          }`}
-                        >
-                          {t.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-slate-400 text-[11px] whitespace-nowrap">
-                        {t.referenceNumber}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+      {/* Flagship Production Deployments (Case Studies) */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+            Production Deployments & Case Studies
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Verified enterprise applications delivered by Saras Dynamics.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {PORTFOLIO_PROJECTS.map((proj, idx) => (
+            <div
+              key={idx}
+              className="bg-white dark:bg-[#171717] rounded-2xl p-6 border border-[#E5E5E7] dark:border-[#262626] shadow-xs space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-[#E50918] uppercase tracking-wider">
+                  CASE STUDY #{idx + 1}
+                </span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              </div>
+              <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                {proj.title}
+              </h3>
+              <p className="text-[11px] font-semibold text-slate-400">
+                {proj.category}
+              </p>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                {proj.description}
+              </p>
+              <div className="p-3 rounded-xl bg-[#F5F5F7] dark:bg-[#222222] border border-[#E5E5E7] dark:border-[#2a2a2a] text-[11px] font-mono text-slate-700 dark:text-slate-300">
+                {proj.metrics}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Complaints Section */}
-      <div>
-        <h2 className="text-base font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-500" />
-          Service Grievances & Complaints ({complaints.length})
-        </h2>
-        {complaints.length === 0 ? (
-          <p className="text-xs text-slate-400 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-            No active grievances registered.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {complaints.map((c) => (
-              <div
-                key={c.id}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-xs text-slate-900 dark:text-white">
-                      {c.id}
-                    </span>
-                    <span className="font-semibold text-xs text-slate-700 dark:text-slate-300">
-                      {c.category}
-                    </span>
-                  </div>
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      c.status === 'RESOLVED'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-blue-100 text-blue-800'
-                    }`}
-                  >
-                    {c.status}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600 dark:text-slate-300 mt-2">{c.description}</p>
-                {c.resolutionNotes && (
-                  <p className="text-[11px] text-slate-400 mt-2 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg">
-                    Resolution: {c.resolutionNotes}
-                  </p>
-                )}
-              </div>
-            ))}
+      {/* Project Discovery Consultation Form */}
+      <div id="consultation-form" className="bg-white dark:bg-[#171717] rounded-2xl p-6 sm:p-10 border border-[#E5E5E7] dark:border-[#262626] shadow-sm space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-[#E5E5E7] dark:border-[#262626]">
+          <div>
+            <span className="text-[10px] font-black uppercase text-[#E50918] tracking-wider block">
+              Direct Solution Architecture
+            </span>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mt-1">
+              Configure Your Project Discovery Session
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Currently selected capability:{' '}
+              <strong className="text-[#E50918]">{activeServiceData.title}</strong>
+            </p>
           </div>
+        </div>
+
+        {submittedLead ? (
+          <div className="p-8 text-center space-y-3 bg-red-50/50 dark:bg-red-950/20 rounded-2xl border border-red-200 dark:border-red-900/40">
+            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+              <Check className="w-6 h-6" />
+            </div>
+            <h3 className="font-bold text-base text-slate-900 dark:text-white">
+              Project Enquiry Registered Successfully!
+            </h3>
+            <p className="text-xs text-slate-600 dark:text-slate-300 max-w-md mx-auto">
+              Thank you {submittedLead.customerName}. Our solution architecture team has received your project requirements for {submittedLead.requiredService}. We will be in contact shortly.
+            </p>
+            <button
+              onClick={() => setSubmittedLead(null)}
+              className="mt-2 px-4 py-2 rounded-xl bg-[#E50918] hover:bg-[#C90012] text-white text-xs font-bold transition-all shadow-xs"
+            >
+              Submit Another Enquiry
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Your Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={leadForm.name}
+                  onChange={(e) => setLeadForm({ ...leadForm, name: e.target.value })}
+                  placeholder="e.g. Maya Chen"
+                  className="w-full bg-[#F5F5F7] dark:bg-[#222222] border border-[#E5E5E7] dark:border-[#333333] rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#E50918]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Company / Organization
+                </label>
+                <input
+                  type="text"
+                  value={leadForm.company}
+                  onChange={(e) => setLeadForm({ ...leadForm, company: e.target.value })}
+                  placeholder="e.g. Global Tech Labs"
+                  className="w-full bg-[#F5F5F7] dark:bg-[#222222] border border-[#E5E5E7] dark:border-[#333333] rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#E50918]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Business Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={leadForm.email}
+                  onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })}
+                  placeholder="maya@company.com"
+                  className="w-full bg-[#F5F5F7] dark:bg-[#222222] border border-[#E5E5E7] dark:border-[#333333] rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#E50918]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Phone Number *
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={leadForm.phone}
+                  onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })}
+                  placeholder="+91 98765 43210"
+                  className="w-full bg-[#F5F5F7] dark:bg-[#222222] border border-[#E5E5E7] dark:border-[#333333] rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#E50918]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Estimated Budget Tier
+                </label>
+                <select
+                  value={leadForm.budget}
+                  onChange={(e) => setLeadForm({ ...leadForm, budget: e.target.value })}
+                  className="w-full bg-[#F5F5F7] dark:bg-[#222222] border border-[#E5E5E7] dark:border-[#333333] rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#E50918]"
+                >
+                  <option value="$10,000 - $25,000">$10,000 - $25,000 (Sprint POC)</option>
+                  <option value="$25,000 - $50,000">$25,000 - $50,000 (Standard MVP)</option>
+                  <option value="$50,000 - $100,000">$50,000 - $100,000 (Full Production Platform)</option>
+                  <option value="$100,000+">$100,000+ (Enterprise Multi-phase)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Expected Timeline
+                </label>
+                <select
+                  value={leadForm.timeline}
+                  onChange={(e) => setLeadForm({ ...leadForm, timeline: e.target.value })}
+                  className="w-full bg-[#F5F5F7] dark:bg-[#222222] border border-[#E5E5E7] dark:border-[#333333] rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#E50918]"
+                >
+                  <option value="Under 1 month">Under 1 month (Expedited)</option>
+                  <option value="2 to 3 months">2 to 3 months (Standard)</option>
+                  <option value="4 to 6 months">4 to 6 months</option>
+                  <option value="Ongoing Retainer">Ongoing Architecture Retainer</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Project Scope & Technical Objectives *
+              </label>
+              <textarea
+                required
+                rows={4}
+                value={leadForm.description}
+                onChange={(e) => setLeadForm({ ...leadForm, description: e.target.value })}
+                placeholder="Describe your technical requirements, user goals, and current infrastructure constraints..."
+                className="w-full bg-[#F5F5F7] dark:bg-[#222222] border border-[#E5E5E7] dark:border-[#333333] rounded-xl p-3.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#E50918]"
+              />
+            </div>
+
+            <div className="flex items-center justify-end pt-2">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-6 py-3 rounded-xl bg-[#E50918] hover:bg-[#C90012] text-white font-bold text-xs transition-all shadow-md shadow-[#E50918]/25 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" />
+                <span>{isSubmitting ? 'Transmitting Enquiry...' : 'Submit Project Enquiry'}</span>
+              </button>
+            </div>
+          </form>
         )}
       </div>
+
+      {/* Learn More Modal */}
+      {modalState.isOpen && modalState.service && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-[#171717] rounded-2xl p-6 sm:p-8 max-w-2xl w-full border border-[#E5E5E7] dark:border-[#262626] shadow-2xl space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-[#E5E5E7] dark:border-[#262626]">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/40 text-[#E50918]">
+                  {React.createElement(modalState.service.icon, { className: 'w-6 h-6' })}
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    {modalState.service.category}
+                  </span>
+                  <h3 className="font-extrabold text-lg text-slate-900 dark:text-white">
+                    {modalState.service.title}
+                  </h3>
+                </div>
+              </div>
+              <button
+                onClick={() => setModalState({ isOpen: false, service: null })}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                {modalState.service.description}
+              </p>
+
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-2">
+                  Key Technical Capabilities
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {modalState.service.features.map((f, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#E50918] shrink-0 mt-0.5" />
+                      <span>{f}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-2">
+                  Deliverables & Artifacts
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {modalState.service.deliverables.map((deliv, i) => (
+                    <span
+                      key={i}
+                      className="px-2.5 py-1 rounded-lg bg-[#F5F5F7] dark:bg-[#222222] border border-[#E5E5E7] dark:border-[#2a2a2a] text-slate-700 dark:text-slate-300 text-xs font-medium"
+                    >
+                      {deliv}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-2">
+                  Technology Stack
+                </h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {modalState.service.tech.map((t, i) => (
+                    <span
+                      key={i}
+                      className="px-2 py-0.5 rounded-md bg-red-50 dark:bg-red-950/40 text-[#E50918] border border-red-200 dark:border-red-900/40 text-[11px] font-mono font-bold"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E5E5E7] dark:border-[#262626]">
+              <button
+                onClick={() => setModalState({ isOpen: false, service: null })}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  const sId = modalState.service!.id;
+                  setModalState({ isOpen: false, service: null });
+                  handleDiscussService(sId);
+                }}
+                className="px-5 py-2 rounded-xl bg-[#E50918] hover:bg-[#C90012] text-white text-xs font-bold shadow-xs cursor-pointer"
+              >
+                Configure Project
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

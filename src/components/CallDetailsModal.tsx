@@ -1,7 +1,7 @@
-import React from 'react';
-import { CallSession } from '../types/banking.ts';
+import React, { useState, useEffect } from 'react';
+import { CallSession, TranscriptItem, ToolExecution } from '../types/saras.ts';
 import { formatDuration, formatDateTime } from '../utils/formatters.ts';
-import { X, Phone, CheckCircle2, AlertCircle, Wrench, Shield, MessageSquare, Clock } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, Wrench, Shield, MessageSquare, Clock, User, Phone, Zap } from 'lucide-react';
 
 interface CallDetailsModalProps {
   session: CallSession | null;
@@ -9,16 +9,33 @@ interface CallDetailsModalProps {
 }
 
 export const CallDetailsModal: React.FC<CallDetailsModalProps> = ({ session, onClose }) => {
+  const [transcripts, setTranscripts] = useState<TranscriptItem[]>([]);
+  const [tools, setTools] = useState<ToolExecution[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (!session) return;
+    setLoading(true);
+    fetch(`/api/calls/${session.id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setTranscripts(data.transcripts || []);
+        setTools(data.toolExecutions || []);
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
+  }, [session]);
+
   if (!session) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+      <div className="bg-white dark:bg-[#171717] border border-[#E5E5E7] dark:border-[#262626] rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-[#E5E5E7] dark:border-[#262626] bg-[#F5F5F7] dark:bg-[#141414] flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono font-bold text-sm text-blue-600 dark:text-blue-400">
+              <span className="font-mono font-bold text-sm text-[#E50918]">
                 {session.id}
               </span>
               <span
@@ -32,48 +49,59 @@ export const CallDetailsModal: React.FC<CallDetailsModalProps> = ({ session, onC
               >
                 {session.status}
               </span>
-              <span className="text-xs text-slate-400 font-medium">
-                • {session.mode} MODE
-              </span>
+              <span className="text-xs text-slate-400 font-medium">• {session.mode} MODE</span>
+              {session.leadCaptured && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 dark:bg-red-950/60 text-[#E50918] border border-red-200 dark:border-red-900/40">
+                  LEAD CAPTURED
+                </span>
+              )}
             </div>
             <h2 className="text-base font-bold text-slate-900 dark:text-white mt-1">
-              Telephony Call Record Inspection
+              Conversation Session Inspection
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
+            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-700/50 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Content Tabs / Body */}
+        {/* Content Body */}
         <div className="p-6 overflow-y-auto space-y-6">
           {/* Metadata Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-xl bg-[#F5F5F7] dark:bg-[#141414] border border-[#E5E5E7] dark:border-[#262626] text-xs">
             <div>
-              <span className="text-slate-400 block">Customer</span>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Visitor / Client</span>
               <span className="font-bold text-slate-800 dark:text-white mt-0.5 block truncate">
-                {session.customerName || 'Unauthenticated Caller'}
+                {session.customerName || 'Website Visitor'}
               </span>
             </div>
             <div>
-              <span className="text-slate-400 block">Caller Phone</span>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Caller Identifier</span>
               <span className="font-mono font-bold text-slate-800 dark:text-white mt-0.5 block">
                 {session.callerNumber}
               </span>
             </div>
             <div>
-              <span className="text-slate-400 block">Call Duration</span>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Duration</span>
               <span className="font-bold text-slate-800 dark:text-white mt-0.5 block">
                 {formatDuration(session.durationSeconds)}
               </span>
             </div>
             <div>
-              <span className="text-slate-400 block">Language</span>
-              <span className="font-bold text-slate-800 dark:text-white mt-0.5 block">
-                {session.language}
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Sentiment</span>
+              <span
+                className={`font-bold mt-0.5 block ${
+                  session.sentiment === 'POSITIVE'
+                    ? 'text-emerald-500'
+                    : session.sentiment === 'FRUSTRATED'
+                    ? 'text-[#E50918]'
+                    : 'text-slate-400'
+                }`}
+              >
+                {session.sentiment}
               </span>
             </div>
           </div>
@@ -81,48 +109,46 @@ export const CallDetailsModal: React.FC<CallDetailsModalProps> = ({ session, onC
           {/* Tools Executed Section */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
-              <Wrench className="w-4 h-4 text-blue-600" />
-              Banking Tools Executed ({session.toolsUsed.length})
+              <Zap className="w-4 h-4 text-[#E50918]" />
+              Saras Dynamics Tools Executed ({tools.length})
             </h3>
-            {session.toolsUsed.length === 0 ? (
-              <p className="text-xs text-slate-400 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
-                No backend tools invoked during this conversation.
+            {tools.length === 0 ? (
+              <p className="text-xs text-slate-400 p-3 rounded-xl border border-[#E5E5E7] dark:border-[#262626]">
+                No backend tools invoked during this session.
               </p>
             ) : (
               <div className="space-y-2">
-                {session.toolsUsed.map((tool) => (
+                {tools.map((tool) => (
                   <div
                     key={tool.id}
-                    className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/60 text-xs"
+                    className="p-3.5 rounded-xl border border-[#E5E5E7] dark:border-[#262626] bg-white dark:bg-[#141414] text-xs space-y-1.5"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-slate-900 dark:text-white">
-                          {tool.toolName}
-                        </span>
-                        <span
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                            tool.status === 'SUCCESS'
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                              : 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300'
-                          }`}
-                        >
-                          {tool.status}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        Latency: {tool.executionTimeMs}ms
+                      <span className="font-mono font-bold text-[#E50918]">
+                        {tool.toolName}
+                      </span>
+                      <span
+                        className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                          tool.status === 'SUCCESS'
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                            : 'bg-rose-100 text-rose-700'
+                        }`}
+                      >
+                        {tool.status}
                       </span>
                     </div>
-
-                    <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] font-mono">
-                      <div className="p-2 rounded bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
-                        <span className="text-slate-400 block text-[10px] uppercase font-sans font-bold mb-1">Arguments:</span>
-                        <pre className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{JSON.stringify(tool.args, null, 2)}</pre>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] font-mono">
+                      <div className="bg-[#F5F5F7] dark:bg-[#1f1f1f] p-2.5 rounded-lg border border-[#E5E5E7] dark:border-[#2a2a2a]">
+                        <span className="text-slate-400 block text-[9px] font-sans font-bold uppercase">Args</span>
+                        <pre className="text-slate-700 dark:text-slate-300 overflow-x-auto">
+                          {JSON.stringify(tool.args, null, 2)}
+                        </pre>
                       </div>
-                      <div className="p-2 rounded bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
-                        <span className="text-slate-400 block text-[10px] uppercase font-sans font-bold mb-1">Result:</span>
-                        <pre className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{JSON.stringify(tool.result, null, 2)}</pre>
+                      <div className="bg-[#F5F5F7] dark:bg-[#1f1f1f] p-2.5 rounded-lg border border-[#E5E5E7] dark:border-[#2a2a2a]">
+                        <span className="text-slate-400 block text-[9px] font-sans font-bold uppercase">Result</span>
+                        <pre className="text-slate-700 dark:text-slate-300 overflow-x-auto">
+                          {JSON.stringify(tool.result, null, 2)}
+                        </pre>
                       </div>
                     </div>
                   </div>
@@ -131,41 +157,40 @@ export const CallDetailsModal: React.FC<CallDetailsModalProps> = ({ session, onC
             )}
           </div>
 
-          {/* Full Transcript Section */}
+          {/* Transcript Dialogue */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
-              <MessageSquare className="w-4 h-4 text-teal-600" />
-              Full Conversation Transcript ({session.transcript.length} turns)
+              <MessageSquare className="w-4 h-4 text-[#E50918]" />
+              Dialogue Transcript ({transcripts.length} Turns)
             </h3>
-            <div className="space-y-3 p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 max-h-72 overflow-y-auto">
-              {session.transcript.length === 0 ? (
-                <p className="text-xs text-slate-400 text-center py-4">No speech turns recorded.</p>
-              ) : (
-                session.transcript.map((item) => (
-                  <div key={item.id} className="text-xs">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span
-                        className={`font-bold ${
-                          item.speaker === 'customer'
-                            ? 'text-blue-600 dark:text-blue-400'
-                            : item.speaker === 'agent'
-                            ? 'text-teal-600 dark:text-teal-400'
-                            : 'text-slate-500'
-                        }`}
-                      >
-                        {item.speaker === 'customer' ? 'Customer' : item.speaker === 'agent' ? 'Ananya (AI)' : 'System'}
+            {loading ? (
+              <div className="text-xs text-slate-400 py-4 text-center">Loading transcripts...</div>
+            ) : transcripts.length === 0 ? (
+              <p className="text-xs text-slate-400 p-3 rounded-xl border border-[#E5E5E7] dark:border-[#262626]">
+                No recorded dialogue turns for this call.
+              </p>
+            ) : (
+              <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                {transcripts.map((t) => (
+                  <div
+                    key={t.id}
+                    className={`p-3 rounded-2xl text-xs leading-relaxed ${
+                      t.speaker === 'agent'
+                        ? 'bg-[#F5F5F7] dark:bg-[#222222] text-slate-800 dark:text-slate-200 border-l-4 border-l-[#E50918]'
+                        : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-900 dark:text-slate-100 border-l-4 border-l-slate-400'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1 text-[10px] font-bold text-slate-400">
+                      <span className="uppercase">
+                        {t.speaker === 'agent' ? 'Saras AI Assistant' : 'Visitor'}
                       </span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {new Date(item.timestamp).toLocaleTimeString()}
-                      </span>
+                      <span>{formatDateTime(t.timestamp)}</span>
                     </div>
-                    <p className="text-slate-800 dark:text-slate-200 pl-3 border-l-2 border-slate-200 dark:border-slate-700">
-                      {item.text}
-                    </p>
+                    <div>{t.text}</div>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
